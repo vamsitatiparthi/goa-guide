@@ -1,0 +1,659 @@
+{
+  "sample_itineraries": [
+    {
+      "name": "Family 2-Day Goa Adventure",
+      "description": "Perfect for families with children, balancing beach fun with cultural experiences",
+      "trip_profile": {
+        "duration": 2,
+        "party_composition": {
+          "adults": 2,
+          "children": 2,
+          "infants": 0
+        },
+        "budget_per_person": 4500,
+        "total_budget": 15300,
+        "preferences": ["beaches", "family-friendly", "cultural", "food"]
+      },
+      "itinerary": {
+        "trip_id": "sample_family_001",
+        "status": "optimized",
+        "budget_status": "within_budget",
+        "total_cost": 14800,
+        "currency": "INR",
+        "days": [
+          {
+            "date": "2024-12-15",
+            "activities": [
+              {
+                "activity_id": "baga_beach_family_001",
+                "time": "09:00",
+                "title": "Baga Beach Family Morning",
+                "description": "Family-friendly beach with safe swimming areas, beach shacks, and water sports suitable for children",
+                "duration": 180,
+                "cost_per_person": 800,
+                "location": {
+                  "lat": 15.5557,
+                  "lng": 73.7516,
+                  "address": "Baga Beach, North Goa",
+                  "poi_id": "poi_baga_beach"
+                },
+                "category": "beach",
+                "booking_required": false,
+                "weather_dependent": true
+              },
+              {
+                "activity_id": "lunch_beach_shack_001",
+                "time": "12:30",
+                "title": "Lunch at Britto's Beach Shack",
+                "description": "Famous beach shack serving Goan seafood and continental cuisine with kids menu",
+                "duration": 90,
+                "cost_per_person": 600,
+                "location": {
+                  "lat": 15.5560,
+                  "lng": 73.7518,
+                  "address": "Baga Beach, North Goa"
+                },
+                "category": "food",
+                "booking_required": false,
+                "weather_dependent": false
+              },
+              {
+                "activity_id": "fort_aguada_001",
+                "time": "15:00",
+                "title": "Fort Aguada Historical Tour",
+                "description": "17th-century Portuguese fort with lighthouse, offering panoramic views and historical insights",
+                "duration": 120,
+                "cost_per_person": 200,
+                "location": {
+                  "lat": 15.4943,
+                  "lng": 73.7737,
+                  "address": "Fort Aguada, Sinquerim, Goa"
+                },
+                "category": "cultural",
+                "booking_required": false,
+                "weather_dependent": false
+              },
+              {
+                "activity_id": "candolim_sunset_001",
+                "time": "17:30",
+                "title": "Candolim Beach Sunset",
+                "description": "Peaceful beach perfect for sunset viewing with family, less crowded than other beaches",
+                "duration": 90,
+                "cost_per_person": 100,
+                "location": {
+                  "lat": 15.5185,
+                  "lng": 73.7613,
+                  "address": "Candolim Beach, North Goa"
+                },
+                "category": "beach",
+                "booking_required": false,
+                "weather_dependent": true
+              }
+            ],
+            "total_cost": 5780,
+            "travel_time": 45,
+            "weather_forecast": {
+              "condition": "Sunny",
+              "temperature": 32,
+              "precipitation_chance": 10
+            }
+          },
+          {
+            "date": "2024-12-16",
+            "activities": [
+              {
+                "activity_id": "old_goa_churches_001",
+                "time": "09:00",
+                "title": "Old Goa UNESCO Heritage Churches",
+                "description": "Visit Basilica of Bom Jesus and Se Cathedral, UNESCO World Heritage sites with rich history",
+                "duration": 180,
+                "cost_per_person": 300,
+                "location": {
+                  "lat": 15.5007,
+                  "lng": 73.9115,
+                  "address": "Old Goa, Goa"
+                },
+                "category": "cultural",
+                "booking_required": false,
+                "weather_dependent": false
+              },
+              {
+                "activity_id": "spice_plantation_001",
+                "time": "12:00",
+                "title": "Sahakari Spice Farm Tour with Lunch",
+                "description": "Guided tour of organic spice plantation with traditional Goan lunch, educational for children",
+                "duration": 240,
+                "cost_per_person": 1200,
+                "location": {
+                  "lat": 15.3847,
+                  "lng": 74.1305,
+                  "address": "Ponda, Goa"
+                },
+                "category": "nature",
+                "booking_required": true,
+                "weather_dependent": false
+              },
+              {
+                "activity_id": "anjuna_market_001",
+                "time": "16:30",
+                "title": "Anjuna Flea Market Shopping",
+                "description": "Famous Wednesday market with local crafts, clothes, and souvenirs, great for family shopping",
+                "duration": 120,
+                "cost_per_person": 500,
+                "location": {
+                  "lat": 15.5735,
+                  "lng": 73.7395,
+                  "address": "Anjuna Beach, North Goa"
+                },
+                "category": "shopping",
+                "booking_required": false,
+                "weather_dependent": false
+              }
+            ],
+            "total_cost": 9020,
+            "travel_time": 75,
+            "weather_forecast": {
+              "condition": "Partly Cloudy",
+              "temperature": 30,
+              "precipitation_chance": 20
+            }
+          }
+        ],
+        "alternatives": [
+          {
+            "reason": "Budget optimization",
+            "cost_difference": -2000,
+            "description": "Replace spice plantation with free beach activities and local market lunch",
+            "activities": []
+          },
+          {
+            "reason": "Rainy day backup",
+            "cost_difference": 500,
+            "description": "Indoor activities including museums and shopping malls if weather is poor",
+            "activities": []
+          }
+        ],
+        "optimization_metadata": {
+          "algorithm_version": "1.0.0",
+          "optimization_time_ms": 1250,
+          "budget_utilization": 0.97,
+          "constraints_applied": ["budget_constraint", "child_friendly_constraint"],
+          "fallbacks_used": []
+        },
+        "generated_at": "2024-12-15T10:30:00Z"
+      }
+    },
+    {
+      "name": "Solo Adventure 3-Day Experience",
+      "description": "Adrenaline-packed adventure for solo travelers seeking unique experiences",
+      "trip_profile": {
+        "duration": 3,
+        "party_composition": {
+          "adults": 1,
+          "children": 0,
+          "infants": 0
+        },
+        "budget_per_person": 8000,
+        "total_budget": 8000,
+        "preferences": ["adventure", "nature", "nightlife", "local_experiences"]
+      },
+      "itinerary": {
+        "trip_id": "sample_solo_001",
+        "status": "optimized",
+        "budget_status": "within_budget",
+        "total_cost": 7850,
+        "currency": "INR",
+        "days": [
+          {
+            "date": "2024-12-20",
+            "activities": [
+              {
+                "activity_id": "dudhsagar_trek_001",
+                "time": "05:30",
+                "title": "Dudhsagar Falls Sunrise Trek",
+                "description": "Early morning trek to India's 5th highest waterfall, includes jeep safari and natural pool swimming",
+                "duration": 480,
+                "cost_per_person": 3500,
+                "location": {
+                  "lat": 15.3144,
+                  "lng": 74.3144,
+                  "address": "Dudhsagar Falls, Mollem National Park, Goa"
+                },
+                "category": "adventure",
+                "booking_required": true,
+                "weather_dependent": true
+              },
+              {
+                "activity_id": "local_lunch_mollem_001",
+                "time": "13:30",
+                "title": "Local Goan Lunch at Mollem",
+                "description": "Authentic Goan meal at local restaurant near Mollem, try fish curry rice and bebinca",
+                "duration": 60,
+                "cost_per_person": 400,
+                "location": {
+                  "lat": 15.3200,
+                  "lng": 74.3000,
+                  "address": "Mollem Village, Goa"
+                },
+                "category": "food",
+                "booking_required": false,
+                "weather_dependent": false
+              },
+              {
+                "activity_id": "arambol_sunset_001",
+                "time": "17:00",
+                "title": "Arambol Beach Sunset & Drum Circle",
+                "description": "Hippie beach culture with sunset drum circles, cliff jumping spots, and bohemian vibes",
+                "duration": 180,
+                "cost_per_person": 200,
+                "location": {
+                  "lat": 15.6869,
+                  "lng": 73.7064,
+                  "address": "Arambol Beach, North Goa"
+                },
+                "category": "beach",
+                "booking_required": false,
+                "weather_dependent": true
+              }
+            ],
+            "total_cost": 4100,
+            "travel_time": 120,
+            "weather_forecast": {
+              "condition": "Clear",
+              "temperature": 28,
+              "precipitation_chance": 5
+            }
+          },
+          {
+            "date": "2024-12-21",
+            "activities": [
+              {
+                "activity_id": "scuba_diving_001",
+                "time": "08:00",
+                "title": "Scuba Diving at Grande Island",
+                "description": "PADI certified diving experience with marine life viewing, includes equipment and boat transfer",
+                "duration": 300,
+                "cost_per_person": 2800,
+                "location": {
+                  "lat": 15.2500,
+                  "lng": 73.9500,
+                  "address": "Grande Island, South Goa"
+                },
+                "category": "adventure",
+                "booking_required": true,
+                "weather_dependent": true
+              },
+              {
+                "activity_id": "palolem_beach_001",
+                "time": "14:00",
+                "title": "Palolem Beach Relaxation",
+                "description": "Crescent-shaped beach perfect for post-diving relaxation, beach huts and fresh seafood",
+                "duration": 180,
+                "cost_per_person": 300,
+                "location": {
+                  "lat": 15.0100,
+                  "lng": 74.0233,
+                  "address": "Palolem Beach, South Goa"
+                },
+                "category": "beach",
+                "booking_required": false,
+                "weather_dependent": true
+              },
+              {
+                "activity_id": "silent_disco_001",
+                "time": "20:00",
+                "title": "Silent Disco at Palolem",
+                "description": "Unique nightlife experience with wireless headphones, multiple DJ channels to choose from",
+                "duration": 180,
+                "cost_per_person": 800,
+                "location": {
+                  "lat": 15.0105,
+                  "lng": 74.0230,
+                  "address": "Palolem Beach, South Goa"
+                },
+                "category": "nightlife",
+                "booking_required": false,
+                "weather_dependent": false
+              }
+            ],
+            "total_cost": 3900,
+            "travel_time": 90,
+            "weather_forecast": {
+              "condition": "Sunny",
+              "temperature": 31,
+              "precipitation_chance": 15
+            }
+          },
+          {
+            "date": "2024-12-22",
+            "activities": [
+              {
+                "activity_id": "kayaking_mangroves_001",
+                "time": "07:00",
+                "title": "Mangrove Kayaking at Zuari River",
+                "description": "Peaceful kayaking through mangrove forests, bird watching and nature photography",
+                "duration": 180,
+                "cost_per_person": 1200,
+                "location": {
+                  "lat": 15.3847,
+                  "lng": 73.9734,
+                  "address": "Zuari River, Goa"
+                },
+                "category": "nature",
+                "booking_required": true,
+                "weather_dependent": true
+              },
+              {
+                "activity_id": "local_cooking_class_001",
+                "time": "11:00",
+                "title": "Goan Cooking Class with Local Family",
+                "description": "Learn to cook traditional Goan dishes like fish curry, sorpotel, and feni tasting",
+                "duration": 240,
+                "cost_per_person": 1500,
+                "location": {
+                  "lat": 15.2993,
+                  "lng": 74.1240,
+                  "address": "Panaji, Goa"
+                },
+                "category": "cultural",
+                "booking_required": true,
+                "weather_dependent": false
+              },
+              {
+                "activity_id": "fontainhas_walk_001",
+                "time": "16:00",
+                "title": "Fontainhas Heritage Walk",
+                "description": "Explore colorful Portuguese quarter with colonial architecture and art galleries",
+                "duration": 120,
+                "cost_per_person": 300,
+                "location": {
+                  "lat": 15.2993,
+                  "lng": 73.9730,
+                  "address": "Fontainhas, Panaji, Goa"
+                },
+                "category": "cultural",
+                "booking_required": false,
+                "weather_dependent": false
+              }
+            ],
+            "total_cost": 3000,
+            "travel_time": 60,
+            "weather_forecast": {
+              "condition": "Partly Cloudy",
+              "temperature": 29,
+              "precipitation_chance": 25
+            }
+          }
+        ],
+        "alternatives": [
+          {
+            "reason": "Weather backup",
+            "cost_difference": -500,
+            "description": "Indoor activities if monsoon or heavy rain affects outdoor adventures",
+            "activities": []
+          },
+          {
+            "reason": "Budget extension",
+            "cost_difference": 2000,
+            "description": "Add luxury experiences like helicopter ride and premium dining",
+            "activities": []
+          }
+        ],
+        "optimization_metadata": {
+          "algorithm_version": "1.0.0",
+          "optimization_time_ms": 980,
+          "budget_utilization": 0.98,
+          "constraints_applied": ["budget_constraint", "solo_traveler_optimized"],
+          "fallbacks_used": []
+        },
+        "generated_at": "2024-12-15T10:30:00Z"
+      }
+    },
+    {
+      "name": "Budget Family Day-Trip with Elders",
+      "description": "Accessible and comfortable day trip suitable for elderly family members and children",
+      "trip_profile": {
+        "duration": 1,
+        "party_composition": {
+          "adults": 4,
+          "children": 2,
+          "infants": 1,
+          "elderly": 2
+        },
+        "budget_per_person": 2000,
+        "total_budget": 12000,
+        "preferences": ["family-friendly", "accessible", "cultural", "comfortable"],
+        "constraints": {
+          "mobility_limited": true,
+          "pet_friendly": true
+        }
+      },
+      "itinerary": {
+        "trip_id": "sample_budget_family_001",
+        "status": "optimized",
+        "budget_status": "within_budget",
+        "total_cost": 11200,
+        "currency": "INR",
+        "days": [
+          {
+            "date": "2024-12-18",
+            "activities": [
+              {
+                "activity_id": "miramar_beach_001",
+                "time": "09:00",
+                "title": "Miramar Beach Morning Walk",
+                "description": "Gentle beach with paved walkways, wheelchair accessible, perfect for elderly and children",
+                "duration": 120,
+                "cost_per_person": 0,
+                "location": {
+                  "lat": 15.4909,
+                  "lng": 73.8278,
+                  "address": "Miramar Beach, Panaji, Goa"
+                },
+                "category": "beach",
+                "booking_required": false,
+                "weather_dependent": true,
+                "accessibility": {
+                  "wheelchair_accessible": true,
+                  "mobility_friendly": true
+                }
+              },
+              {
+                "activity_id": "dona_paula_viewpoint_001",
+                "time": "11:30",
+                "title": "Dona Paula Viewpoint",
+                "description": "Scenic viewpoint with easy access, parking available, great for family photos",
+                "duration": 60,
+                "cost_per_person": 50,
+                "location": {
+                  "lat": 15.4553,
+                  "lng": 73.8063,
+                  "address": "Dona Paula, Goa"
+                },
+                "category": "sightseeing",
+                "booking_required": false,
+                "weather_dependent": false,
+                "accessibility": {
+                  "wheelchair_accessible": true,
+                  "mobility_friendly": true
+                }
+              },
+              {
+                "activity_id": "goa_state_museum_001",
+                "time": "13:00",
+                "title": "Goa State Museum Visit",
+                "description": "Air-conditioned museum with Goan history and culture, comfortable for elderly visitors",
+                "duration": 90,
+                "cost_per_person": 20,
+                "location": {
+                  "lat": 15.2993,
+                  "lng": 73.9730,
+                  "address": "Panaji, Goa"
+                },
+                "category": "cultural",
+                "booking_required": false,
+                "weather_dependent": false,
+                "accessibility": {
+                  "wheelchair_accessible": true,
+                  "mobility_friendly": true
+                }
+              },
+              {
+                "activity_id": "family_lunch_panaji_001",
+                "time": "14:30",
+                "title": "Traditional Goan Lunch at Viva Panjim",
+                "description": "Family restaurant with authentic Goan cuisine, high chairs available, pet-friendly outdoor seating",
+                "duration": 90,
+                "cost_per_person": 800,
+                "location": {
+                  "lat": 15.2993,
+                  "lng": 73.9730,
+                  "address": "Fontainhas, Panaji, Goa"
+                },
+                "category": "food",
+                "booking_required": true,
+                "weather_dependent": false,
+                "accessibility": {
+                  "wheelchair_accessible": true,
+                  "mobility_friendly": true
+                }
+              },
+              {
+                "activity_id": "mandovi_river_cruise_001",
+                "time": "16:30",
+                "title": "Mandovi River Sunset Cruise",
+                "description": "Gentle boat cruise with cultural performances, comfortable seating, accessible boarding",
+                "duration": 120,
+                "cost_per_person": 600,
+                "location": {
+                  "lat": 15.2993,
+                  "lng": 73.9730,
+                  "address": "Santa Monica Jetty, Panaji, Goa"
+                },
+                "category": "cruise",
+                "booking_required": true,
+                "weather_dependent": true,
+                "accessibility": {
+                  "wheelchair_accessible": true,
+                  "mobility_friendly": true
+                }
+              },
+              {
+                "activity_id": "18th_june_road_shopping_001",
+                "time": "19:00",
+                "title": "18th June Road Shopping",
+                "description": "Local shopping street with souvenirs and snacks, easy walking, good for family shopping",
+                "duration": 60,
+                "cost_per_person": 300,
+                "location": {
+                  "lat": 15.2993,
+                  "lng": 73.9730,
+                  "address": "18th June Road, Panaji, Goa"
+                },
+                "category": "shopping",
+                "booking_required": false,
+                "weather_dependent": false,
+                "accessibility": {
+                  "wheelchair_accessible": true,
+                  "mobility_friendly": true
+                }
+              }
+            ],
+            "total_cost": 11200,
+            "travel_time": 30,
+            "weather_forecast": {
+              "condition": "Pleasant",
+              "temperature": 27,
+              "precipitation_chance": 10
+            },
+            "accessibility_notes": [
+              "All locations wheelchair accessible",
+              "Parking available at all stops",
+              "Rest areas and clean restrooms available",
+              "Pet-friendly options included"
+            ]
+          }
+        ],
+        "alternatives": [
+          {
+            "reason": "Indoor backup",
+            "cost_difference": 200,
+            "description": "Replace outdoor activities with shopping malls and indoor attractions if weather is poor",
+            "activities": []
+          },
+          {
+            "reason": "Ultra budget",
+            "cost_difference": -3000,
+            "description": "Focus on free beaches and parks with packed lunch option",
+            "activities": []
+          }
+        ],
+        "optimization_metadata": {
+          "algorithm_version": "1.0.0",
+          "optimization_time_ms": 750,
+          "budget_utilization": 0.93,
+          "constraints_applied": ["budget_constraint", "mobility_constraint", "child_friendly_constraint", "pet_friendly_constraint"],
+          "fallbacks_used": []
+        },
+        "generated_at": "2024-12-15T10:30:00Z"
+      }
+    }
+  ],
+  "itinerary_templates": {
+    "beach_lover": {
+      "description": "For travelers who want to spend maximum time at beaches",
+      "typical_activities": ["beach_hopping", "water_sports", "beach_dining", "sunset_viewing"],
+      "budget_range": "2000-6000 INR per person per day"
+    },
+    "culture_enthusiast": {
+      "description": "Focus on Goan heritage, churches, and local traditions",
+      "typical_activities": ["heritage_tours", "museum_visits", "local_interactions", "traditional_dining"],
+      "budget_range": "1500-4000 INR per person per day"
+    },
+    "adventure_seeker": {
+      "description": "High-adrenaline activities and unique experiences",
+      "typical_activities": ["trekking", "water_sports", "wildlife_tours", "night_adventures"],
+      "budget_range": "3000-8000 INR per person per day"
+    },
+    "luxury_traveler": {
+      "description": "Premium experiences with comfort and exclusivity",
+      "typical_activities": ["luxury_resorts", "private_tours", "fine_dining", "spa_treatments"],
+      "budget_range": "8000-20000 INR per person per day"
+    },
+    "backpacker_budget": {
+      "description": "Maximum experiences with minimal budget",
+      "typical_activities": ["free_beaches", "local_transport", "street_food", "hostels"],
+      "budget_range": "800-2000 INR per person per day"
+    }
+  },
+  "seasonal_recommendations": {
+    "peak_season": {
+      "months": ["December", "January", "February"],
+      "characteristics": "Cool and dry weather, highest prices, crowded beaches",
+      "budget_multiplier": 1.5,
+      "recommended_activities": ["beach_activities", "outdoor_adventures", "festivals"],
+      "booking_advice": "Book accommodations and activities well in advance"
+    },
+    "shoulder_season": {
+      "months": ["November", "March"],
+      "characteristics": "Pleasant weather, moderate prices, good availability",
+      "budget_multiplier": 1.2,
+      "recommended_activities": ["all_activities", "cultural_tours", "nature_walks"],
+      "booking_advice": "Good balance of weather and prices"
+    },
+    "off_season": {
+      "months": ["April", "May"],
+      "characteristics": "Hot weather, lowest prices, fewer crowds",
+      "budget_multiplier": 0.8,
+      "recommended_activities": ["early_morning_activities", "indoor_attractions", "beach_evenings"],
+      "booking_advice": "Great deals available, plan for hot weather"
+    },
+    "monsoon": {
+      "months": ["June", "July", "August", "September", "October"],
+      "characteristics": "Heavy rainfall, very low prices, lush green landscapes",
+      "budget_multiplier": 0.6,
+      "recommended_activities": ["indoor_activities", "cultural_sites", "spa_treatments"],
+      "booking_advice": "Many beach activities unavailable, focus on indoor experiences"
+    }
+  }
+}

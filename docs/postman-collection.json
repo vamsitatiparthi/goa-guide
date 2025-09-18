@@ -1,0 +1,403 @@
+{
+  "info": {
+    "name": "GoaGuide API Collection",
+    "description": "Production-grade travel itinerary & marketplace platform API collection",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "trip_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "provider_api_key",
+      "value": "{{API_KEY}}",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Trip Management",
+      "item": [
+        {
+          "name": "Create Trip - Minimal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destination\": \"Goa\",\n  \"message\": \"I want to go to Goa\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/trips",
+              "host": ["{{base_url}}"],
+              "path": ["trips"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('trip_id', response.trip_id);",
+                  "    pm.test('Trip created successfully', function () {",
+                  "        pm.expect(response.trip_id).to.exist;",
+                  "        pm.expect(response.status).to.equal('created');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Trip - Detailed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destination\": \"Goa\",\n  \"message\": \"Family trip to Goa with kids\",\n  \"dates\": {\n    \"start_date\": \"2024-12-15\",\n    \"end_date\": \"2024-12-17\"\n  },\n  \"party_composition\": {\n    \"adults\": 2,\n    \"children\": 2,\n    \"infants\": 0\n  },\n  \"budget_per_person\": 5000,\n  \"preferences\": [\n    \"beaches\",\n    \"family-friendly\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/trips",
+              "host": ["{{base_url}}"],
+              "path": ["trips"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Trip Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/trips/{{trip_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["trips", "{{trip_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Trip Answers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [\n    {\n      \"question_id\": \"budget_range\",\n      \"answer\": \"3000-5000\"\n    },\n    {\n      \"question_id\": \"travel_style\",\n      \"answer\": \"relaxed\"\n    },\n    {\n      \"question_id\": \"dietary_restrictions\",\n      \"answer\": \"vegetarian\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/trips/{{trip_id}}/answers",
+              "host": ["{{base_url}}"],
+              "path": ["trips", "{{trip_id}}", "answers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Trip Itinerary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/trips/{{trip_id}}/itinerary?regenerate=false",
+              "host": ["{{base_url}}"],
+              "path": ["trips", "{{trip_id}}", "itinerary"],
+              "query": [
+                {
+                  "key": "regenerate",
+                  "value": "false"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Adventure Photo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "activity_id",
+                  "value": "activity_123",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "{\"lat\": 15.5557, \"lng\": 73.7516}",
+                  "type": "text"
+                },
+                {
+                  "key": "timestamp",
+                  "value": "2024-12-15T10:30:00Z",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/trips/{{trip_id}}/photo",
+              "host": ["{{base_url}}"],
+              "path": ["trips", "{{trip_id}}", "photo"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Booking Management",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activity_ids\": [\n    \"activity_123\",\n    \"activity_456\"\n  ],\n  \"payment_method\": \"card\",\n  \"consent_token\": \"consent_abc123\",\n  \"idempotency_key\": \"booking_xyz789\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/trips/{{trip_id}}/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["trips", "{{trip_id}}", "bookings"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Search Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/events?lat=15.2993&lng=74.1240&radius=10&date=2024-12-15&category=festival&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["events"],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "15.2993"
+                },
+                {
+                  "key": "lng",
+                  "value": "74.1240"
+                },
+                {
+                  "key": "radius",
+                  "value": "10"
+                },
+                {
+                  "key": "date",
+                  "value": "2024-12-15"
+                },
+                {
+                  "key": "category",
+                  "value": "festival"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Provider APIs",
+      "item": [
+        {
+          "name": "Receive RFP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Provider-API-Key",
+                "value": "{{provider_api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rfp_id\": \"rfp_123456\",\n  \"trip_profile\": {\n    \"age_bracket\": \"25-35\",\n    \"gender\": \"mixed\",\n    \"party_size\": 4,\n    \"trip_type\": \"family\",\n    \"budget_per_person\": 4000,\n    \"preferences\": [\n      \"beaches\",\n      \"family-friendly\"\n    ]\n  },\n  \"activities_requested\": [\n    {\n      \"category\": \"beach\",\n      \"duration\": 180,\n      \"date\": \"2024-12-15\"\n    },\n    {\n      \"category\": \"cultural\",\n      \"duration\": 120,\n      \"date\": \"2024-12-16\"\n    }\n  ],\n  \"response_deadline\": \"2024-12-10T18:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/provider/rfps",
+              "host": ["{{base_url}}"],
+              "path": ["provider", "rfps"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Provider-API-Key",
+                "value": "{{provider_api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider_id\": \"provider_789\",\n  \"activities\": [\n    {\n      \"activity_id\": \"beach_tour_001\",\n      \"title\": \"Baga Beach Family Package\",\n      \"description\": \"Family-friendly beach experience with water sports\",\n      \"price_per_person\": 1200,\n      \"duration\": 180,\n      \"availability\": true,\n      \"includes\": [\n        \"Beach access\",\n        \"Water sports equipment\",\n        \"Refreshments\"\n      ]\n    }\n  ],\n  \"total_cost\": 4800,\n  \"validity_hours\": 24,\n  \"terms_conditions\": \"Cancellation allowed up to 24 hours before\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/provider/rfps/rfp_123456/offers",
+              "host": ["{{base_url}}"],
+              "path": ["provider", "rfps", "rfp_123456", "offers"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health & Monitoring",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["metrics"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-generate trace ID for requests",
+          "pm.request.headers.add({",
+          "    key: 'X-Trace-ID',",
+          "    value: 'trace_' + Math.random().toString(36).substr(2, 9)",
+          "});",
+          "",
+          "// Set timestamp",
+          "pm.request.headers.add({",
+          "    key: 'X-Request-Time',",
+          "    value: new Date().toISOString()",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test for response time",
+          "pm.test('Response time is less than 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "// Global test for trace ID in response",
+          "pm.test('Response contains trace ID', function () {",
+          "    pm.expect(pm.response.headers.get('X-Trace-ID')).to.exist;",
+          "});",
+          "",
+          "// Log response for debugging",
+          "if (pm.response.code >= 400) {",
+          "    console.log('Error Response:', pm.response.json());",
+          "}"
+        ]
+      }
+    }
+  ]
+}

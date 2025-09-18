@@ -1,0 +1,933 @@
+openapi: 3.0.3
+info:
+  title: GoaGuide API
+  description: Production-grade travel itinerary & marketplace platform for Goa
+  version: 1.0.0
+  contact:
+    name: GoaGuide API Support
+    email: api-support@goaguide.com
+  license:
+    name: Proprietary
+    url: https://goaguide.com/license
+
+servers:
+  - url: https://api.goaguide.com/v1
+    description: Production server
+  - url: https://staging-api.goaguide.com/v1
+    description: Staging server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # Trip Management Endpoints
+  /trips:
+    post:
+      tags:
+        - Trips
+      summary: Create a new trip
+      description: Create a new trip with minimal input for itinerary generation
+      operationId: createTrip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripRequest'
+            examples:
+              minimal:
+                summary: Minimal trip creation
+                value:
+                  destination: "Goa"
+                  message: "I want to go to Goa"
+              detailed:
+                summary: Detailed trip creation
+                value:
+                  destination: "Goa"
+                  message: "Family trip to Goa with kids"
+                  dates:
+                    start_date: "2024-12-15"
+                    end_date: "2024-12-17"
+                  party_composition:
+                    adults: 2
+                    children: 2
+                    infants: 0
+                  budget_per_person: 5000
+                  preferences:
+                    - "beaches"
+                    - "family-friendly"
+      responses:
+        '201':
+          description: Trip created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /trips/{tripId}:
+    get:
+      tags:
+        - Trips
+      summary: Get trip details
+      operationId: getTrip
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+      responses:
+        '200':
+          description: Trip details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trips/{tripId}/answers:
+    post:
+      tags:
+        - Trips
+      summary: Submit answers to follow-up questions
+      description: Provide additional information for itinerary optimization
+      operationId: submitTripAnswers
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TripAnswersRequest'
+            example:
+              answers:
+                - question_id: "budget_range"
+                  answer: "3000-5000"
+                - question_id: "travel_style"
+                  answer: "relaxed"
+                - question_id: "dietary_restrictions"
+                  answer: "vegetarian"
+      responses:
+        '200':
+          description: Answers submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripResponse'
+
+  /trips/{tripId}/itinerary:
+    get:
+      tags:
+        - Trips
+      summary: Get generated itinerary
+      description: Retrieve the optimized itinerary for the trip
+      operationId: getTripItinerary
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+        - name: regenerate
+          in: query
+          description: Force regeneration of itinerary
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Itinerary retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItineraryResponse'
+              examples:
+                family_trip:
+                  summary: Family 2-day itinerary
+                  value:
+                    trip_id: "trip_123"
+                    status: "generated"
+                    budget_status: "within_budget"
+                    total_cost: 18000
+                    days:
+                      - date: "2024-12-15"
+                        activities:
+                          - time: "09:00"
+                            title: "Baga Beach Visit"
+                            description: "Family-friendly beach with water sports"
+                            duration: 180
+                            cost_per_person: 500
+                            location:
+                              lat: 15.5557
+                              lng: 73.7516
+                solo_adventure:
+                  summary: Solo adventure itinerary
+                  value:
+                    trip_id: "trip_456"
+                    status: "generated"
+                    budget_status: "within_budget"
+                    total_cost: 8500
+                    days:
+                      - date: "2024-12-20"
+                        activities:
+                          - time: "05:00"
+                            title: "Sunrise Trek at Dudhsagar Falls"
+                            description: "Early morning trek to witness sunrise"
+                            duration: 240
+                            cost_per_person: 2500
+
+  /trips/{tripId}/photo:
+    post:
+      tags:
+        - Trips
+      summary: Upload and verify adventure photo
+      description: Upload photo with EXIF validation and authenticity verification
+      operationId: uploadTripPhoto
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: Photo file (JPEG/PNG)
+                activity_id:
+                  type: string
+                  description: Associated activity ID
+                location:
+                  type: object
+                  properties:
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Photo uploaded and verification initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoVerificationResponse'
+
+  /trips/{tripId}/bookings:
+    post:
+      tags:
+        - Bookings
+      summary: Create booking for trip activities
+      description: Create idempotent booking with hold → confirm flow
+      operationId: createBooking
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+            example:
+              activity_ids:
+                - "activity_123"
+                - "activity_456"
+              payment_method: "card"
+              consent_token: "consent_abc123"
+              idempotency_key: "booking_xyz789"
+      responses:
+        '201':
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+
+  # Events Endpoints
+  /events:
+    get:
+      tags:
+        - Events
+      summary: Search local events
+      description: Find events by location, date, and category
+      operationId: searchEvents
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+          example: 15.2993
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+          example: 74.1240
+        - name: radius
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+          description: Search radius in kilometers
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-12-15"
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [festival, market, party, cultural, sports, food]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventsResponse'
+
+  # Provider Endpoints
+  /provider/rfps:
+    post:
+      tags:
+        - Provider
+      summary: Receive RFP from platform
+      description: Receive anonymized request for proposal
+      operationId: receiveRFP
+      security:
+        - ProviderApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RFPRequest'
+            example:
+              rfp_id: "rfp_123456"
+              trip_profile:
+                age_bracket: "25-35"
+                gender: "mixed"
+                party_size: 4
+                trip_type: "family"
+                budget_per_person: 4000
+                preferences:
+                  - "beaches"
+                  - "family-friendly"
+              activities_requested:
+                - category: "beach"
+                  duration: 180
+                  date: "2024-12-15"
+                - category: "cultural"
+                  duration: 120
+                  date: "2024-12-16"
+              response_deadline: "2024-12-10T18:00:00Z"
+      responses:
+        '200':
+          description: RFP received successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "received"
+                  rfp_id:
+                    type: string
+                    example: "rfp_123456"
+
+  /provider/rfps/{rfpId}/offers:
+    post:
+      tags:
+        - Provider
+      summary: Submit offer for RFP
+      description: Submit competitive offer with pricing and availability
+      operationId: submitOffer
+      security:
+        - ProviderApiKey: []
+      parameters:
+        - name: rfpId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfferRequest'
+            example:
+              provider_id: "provider_789"
+              activities:
+                - activity_id: "beach_tour_001"
+                  title: "Baga Beach Family Package"
+                  description: "Family-friendly beach experience with water sports"
+                  price_per_person: 1200
+                  duration: 180
+                  availability: true
+                  includes:
+                    - "Beach access"
+                    - "Water sports equipment"
+                    - "Refreshments"
+              total_cost: 4800
+              validity_hours: 24
+              terms_conditions: "Cancellation allowed up to 24 hours before"
+      responses:
+        '201':
+          description: Offer submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfferResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    ProviderApiKey:
+      type: apiKey
+      in: header
+      name: X-Provider-API-Key
+
+  parameters:
+    TripId:
+      name: tripId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: "trip_123456"
+
+  schemas:
+    CreateTripRequest:
+      type: object
+      required:
+        - destination
+        - message
+      properties:
+        destination:
+          type: string
+          example: "Goa"
+        message:
+          type: string
+          example: "I want to go to Goa for a family vacation"
+        dates:
+          type: object
+          properties:
+            start_date:
+              type: string
+              format: date
+            end_date:
+              type: string
+              format: date
+        party_composition:
+          type: object
+          properties:
+            adults:
+              type: integer
+              minimum: 1
+            children:
+              type: integer
+              minimum: 0
+            infants:
+              type: integer
+              minimum: 0
+        budget_per_person:
+          type: number
+          minimum: 500
+        preferences:
+          type: array
+          items:
+            type: string
+
+    TripResponse:
+      type: object
+      properties:
+        trip_id:
+          type: string
+        status:
+          type: string
+          enum: [created, questions_pending, generating, ready, booked]
+        destination:
+          type: string
+        follow_up_questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FollowUpQuestion'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FollowUpQuestion:
+      type: object
+      properties:
+        question_id:
+          type: string
+        question:
+          type: string
+        type:
+          type: string
+          enum: [single_choice, multiple_choice, text, number, date]
+        options:
+          type: array
+          items:
+            type: string
+        required:
+          type: boolean
+
+    TripAnswersRequest:
+      type: object
+      required:
+        - answers
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              question_id:
+                type: string
+              answer:
+                type: string
+
+    ItineraryResponse:
+      type: object
+      properties:
+        trip_id:
+          type: string
+        status:
+          type: string
+          enum: [generating, generated, optimized]
+        budget_status:
+          type: string
+          enum: [within_budget, budget_exceeded, budget_unknown]
+        total_cost:
+          type: number
+        currency:
+          type: string
+          default: "INR"
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayItinerary'
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alternative'
+        generated_at:
+          type: string
+          format: date-time
+
+    DayItinerary:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        total_cost:
+          type: number
+        travel_time:
+          type: integer
+          description: Total travel time in minutes
+
+    Activity:
+      type: object
+      properties:
+        activity_id:
+          type: string
+        time:
+          type: string
+          format: time
+        title:
+          type: string
+        description:
+          type: string
+        duration:
+          type: integer
+          description: Duration in minutes
+        cost_per_person:
+          type: number
+        location:
+          $ref: '#/components/schemas/Location'
+        category:
+          type: string
+        provider_id:
+          type: string
+        booking_required:
+          type: boolean
+        weather_dependent:
+          type: boolean
+
+    Location:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: float
+        lng:
+          type: number
+          format: float
+        address:
+          type: string
+        poi_id:
+          type: string
+
+    Alternative:
+      type: object
+      properties:
+        reason:
+          type: string
+        cost_difference:
+          type: number
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+
+    PhotoVerificationResponse:
+      type: object
+      properties:
+        photo_id:
+          type: string
+        status:
+          type: string
+          enum: [uploaded, verifying, verified, rejected, manual_review]
+        verification_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        issues:
+          type: array
+          items:
+            type: string
+        verified_at:
+          type: string
+          format: date-time
+
+    CreateBookingRequest:
+      type: object
+      required:
+        - activity_ids
+        - payment_method
+        - consent_token
+        - idempotency_key
+      properties:
+        activity_ids:
+          type: array
+          items:
+            type: string
+        payment_method:
+          type: string
+          enum: [card, upi, wallet, bank_transfer]
+        consent_token:
+          type: string
+          description: Explicit consent for PII sharing
+        idempotency_key:
+          type: string
+          description: Unique key for idempotent booking
+
+    BookingResponse:
+      type: object
+      properties:
+        booking_id:
+          type: string
+        status:
+          type: string
+          enum: [hold, confirmed, cancelled, refunded]
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookedActivity'
+        total_amount:
+          type: number
+        payment_status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        confirmation_deadline:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    BookedActivity:
+      type: object
+      properties:
+        activity_id:
+          type: string
+        booking_reference:
+          type: string
+        provider_confirmation:
+          type: string
+        amount:
+          type: number
+        status:
+          type: string
+
+    EventsResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        total_count:
+          type: integer
+        has_more:
+          type: boolean
+
+    Event:
+      type: object
+      properties:
+        event_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        location:
+          $ref: '#/components/schemas/Location'
+        price_range:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        source:
+          type: string
+        impact_level:
+          type: string
+          enum: [low, medium, high]
+
+    RFPRequest:
+      type: object
+      required:
+        - rfp_id
+        - trip_profile
+        - activities_requested
+        - response_deadline
+      properties:
+        rfp_id:
+          type: string
+        trip_profile:
+          $ref: '#/components/schemas/AnonymizedProfile'
+        activities_requested:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityRequest'
+        response_deadline:
+          type: string
+          format: date-time
+
+    AnonymizedProfile:
+      type: object
+      properties:
+        age_bracket:
+          type: string
+          enum: ["18-25", "25-35", "35-45", "45-55", "55+"]
+        gender:
+          type: string
+          enum: ["male", "female", "mixed", "other"]
+        party_size:
+          type: integer
+        trip_type:
+          type: string
+          enum: ["solo", "couple", "family", "friends", "business"]
+        budget_per_person:
+          type: number
+        preferences:
+          type: array
+          items:
+            type: string
+
+    ActivityRequest:
+      type: object
+      properties:
+        category:
+          type: string
+        duration:
+          type: integer
+        date:
+          type: string
+          format: date
+        time_preference:
+          type: string
+          enum: ["morning", "afternoon", "evening", "flexible"]
+        location_preference:
+          $ref: '#/components/schemas/Location'
+
+    OfferRequest:
+      type: object
+      required:
+        - provider_id
+        - activities
+        - total_cost
+        - validity_hours
+      properties:
+        provider_id:
+          type: string
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/OfferedActivity'
+        total_cost:
+          type: number
+        validity_hours:
+          type: integer
+        terms_conditions:
+          type: string
+
+    OfferedActivity:
+      type: object
+      properties:
+        activity_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        price_per_person:
+          type: number
+        duration:
+          type: integer
+        availability:
+          type: boolean
+        includes:
+          type: array
+          items:
+            type: string
+        excludes:
+          type: array
+          items:
+            type: string
+
+    OfferResponse:
+      type: object
+      properties:
+        offer_id:
+          type: string
+        status:
+          type: string
+          enum: [submitted, under_review, accepted, rejected, expired]
+        submitted_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            trace_id:
+              type: string
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "INVALID_INPUT"
+              message: "Required field 'destination' is missing"
+              trace_id: "trace_123456"
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Invalid or expired JWT token"
+              trace_id: "trace_123456"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Trip with ID 'trip_123' not found"
+              trace_id: "trace_123456"
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "RATE_LIMITED"
+              message: "Rate limit exceeded. Try again in 60 seconds"
+              trace_id: "trace_123456"
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Number of seconds to wait before retrying
