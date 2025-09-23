@@ -141,11 +141,15 @@ router.post('/', authenticateUser, validateTrip, async (req, res) => {
     // Generate initial questions
     const nextQuestions = generateQuestions(trip);
     
-    // Log audit event
-    await pool.query(
-      'SELECT log_audit_event($1, $2, $3, $4)',
-      ['trip_created', 'trip', trip.id, JSON.stringify({ destination, input_text })]
-    );
+    // Log audit event (best-effort; ignore if function is missing)
+    try {
+      await pool.query(
+        'SELECT log_audit_event($1, $2, $3, $4)',
+        ['trip_created', 'trip', trip.id, JSON.stringify({ destination, input_text })]
+      );
+    } catch (e) {
+      console.warn('log_audit_event not available, continuing. Error:', e.message);
+    }
     
     res.status(201).json({
       id: trip.id,
@@ -272,11 +276,15 @@ router.post('/:tripId/answers', authenticateUser, validateAnswers, async (req, r
       );
     }
     
-    // Log audit event
-    await pool.query(
-      'SELECT log_audit_event($1, $2, $3, $4)',
-      ['answers_submitted', 'trip', tripId, JSON.stringify(answers)]
-    );
+    // Log audit event (best-effort)
+    try {
+      await pool.query(
+        'SELECT log_audit_event($1, $2, $3, $4)',
+        ['answers_submitted', 'trip', tripId, JSON.stringify(answers)]
+      );
+    } catch (e) {
+      console.warn('log_audit_event not available, continuing. Error:', e.message);
+    }
     
     res.json({
       trip_id: tripId,
@@ -336,11 +344,15 @@ router.post('/:tripId/consent', authenticateUser, [
       [JSON.stringify({ [consentToken]: { categories: pii_categories, expires_at: expiresAt } }), tripId, req.userId]
     );
     
-    // Log audit event
-    await pool.query(
-      'SELECT log_audit_event($1, $2, $3, $4)',
-      ['consent_granted', 'trip', tripId, JSON.stringify({ pii_categories, consent_token: consentToken })]
-    );
+    // Log audit event (best-effort)
+    try {
+      await pool.query(
+        'SELECT log_audit_event($1, $2, $3, $4)',
+        ['consent_granted', 'trip', tripId, JSON.stringify({ pii_categories, consent_token: consentToken })]
+      );
+    } catch (e) {
+      console.warn('log_audit_event not available, continuing. Error:', e.message);
+    }
     
     res.json({
       consent_token: consentToken,

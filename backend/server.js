@@ -5,16 +5,38 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+/*const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});*/
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Trust proxy for correct client IPs behind proxies (Railway/Vercel)
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
 app.use(compression());
+// CORS with multi-origin support via comma-separated CORS_ORIGIN
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow non-browser tools
+    const ok = allowedOrigins.includes(origin);
+    return callback(null, ok);
+  },
+  credentials: true,
 }));
 
 // Rate limiting
@@ -40,6 +62,24 @@ app.get('/health', (req, res) => {
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// DB health and schema checks
+app.get('/health/db', async (req, res) => {
+  try {
+    const now = await pool.query('select now() as now');
+    const tripsTable = await pool.query(
+      `select to_regclass('public.trips') as trips_exists, to_regclass('public.consent_records') as consent_exists`
+    );
+    res.json({
+      db_connected: true,
+      now: now.rows[0].now,
+      schema: tripsTable.rows[0],
+    });
+  } catch (e) {
+    console.error('DB health error:', e);
+    res.status(500).json({ db_connected: false, error: e.message });
+  }
 });
 
 // API Routes
