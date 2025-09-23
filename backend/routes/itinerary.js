@@ -152,22 +152,22 @@ class ItineraryOptimizer {
       const estimatedCost = this.estimatePOICost(poi);
       
       // Budget score (higher score for lower cost)
-      if (estimatedCost <= activityBudget * 0.3) score += 30;
-      else if (estimatedCost <= activityBudget * 0.5) score += 20;
-      else if (estimatedCost <= activityBudget * 0.7) score += 10;
+      if (estimatedCost <= activityBudget * 0.3) score += 35;
+      else if (estimatedCost <= activityBudget * 0.5) score += 22;
+      else if (estimatedCost <= activityBudget * 0.7) score += 12;
       
       // Trip type preference score
       score += this.getTripTypeScore(poi, this.tripType);
       
-      // Rating score
-      score += (poi.rating || 4.0) * 5;
+      // Rating score (increase influence)
+      score += (poi.rating || 4.0) * 8;
       
-      // Category preference score
+      // Category preference score (increase influence of user's interests)
       if (this.preferences.interests) {
         const categoryMatch = this.preferences.interests.some(interest => 
           this.matchCategory(poi.category, interest)
         );
-        if (categoryMatch) score += 15;
+        if (categoryMatch) score += 30;
       }
       
       return { ...poi, score, estimated_cost: estimatedCost };

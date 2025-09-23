@@ -284,6 +284,30 @@ function QuestionsStep({ trip, onSubmit, loading }: any) {
 }
 
 function ItineraryStep({ itinerary }: any) {
+  const [localItinerary, setLocalItinerary] = useState(itinerary);
+
+  const handleReoptimize = async () => {
+    try {
+      toast.loading('Re-optimizing itinerary...', { id: 'reopt' });
+      // Ask backend to re-optimize with a small budget tweak as demo
+      await axios.post(`${API_BASE_URL}/trips/${localItinerary.trip_id}/optimize`, {
+        budget_adjustment: 0, // keep same for now; endpoint is stubbed but ready
+      }, {
+        headers: { 'x-user-id': 'demo-user-123' }
+      });
+
+      // Re-fetch itinerary
+      const refreshed = await axios.get(`${API_BASE_URL}/trips/${localItinerary.trip_id}/itinerary`, {
+        headers: { 'x-user-id': 'demo-user-123' }
+      });
+      setLocalItinerary(refreshed.data);
+      toast.success('Itinerary updated!', { id: 'reopt' });
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to re-optimize itinerary', { id: 'reopt' });
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -300,27 +324,27 @@ function ItineraryStep({ itinerary }: any) {
             <span className={`ml-2 px-3 py-1 rounded-full text-white ${
               itinerary.budget_status === 'within_budget' ? 'bg-green-500' : 'bg-red-500'
             }`}>
-              ₹{itinerary.total_cost?.toLocaleString()}
+              ₹{localItinerary.total_cost?.toLocaleString()}
             </span>
           </div>
           <div className="flex items-center">
             <span className="font-semibold">Optimization Score:</span>
-            <span className="ml-2 text-orange-600 font-bold">{itinerary.optimization_score}/100</span>
+            <span className="ml-2 text-orange-600 font-bold">{localItinerary.optimization_score}/100</span>
           </div>
         </div>
       </div>
 
-      {itinerary.budget_status === 'over_budget' && itinerary.alternatives?.length > 0 && (
+      {localItinerary.budget_status === 'over_budget' && localItinerary.alternatives?.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-yellow-800 mb-2">
             💡 Budget Alternatives Available
           </h3>
           <p className="text-yellow-700 mb-4">
-            Your itinerary exceeds budget by ₹{(itinerary.total_cost - itinerary.budget_limit).toLocaleString()}. 
+            Your itinerary exceeds budget by ₹{(localItinerary.total_cost - localItinerary.budget_limit).toLocaleString()}. 
             Here are some alternatives:
           </p>
           <div className="space-y-2">
-            {itinerary.alternatives.map((alt: any, index: number) => (
+            {localItinerary.alternatives.map((alt: any, index: number) => (
               <div key={index} className="bg-white p-3 rounded-lg">
                 <span className="font-medium">{alt.description}</span>
                 <span className="text-green-600 ml-2">Save ₹{alt.savings?.toLocaleString()}</span>
@@ -331,7 +355,7 @@ function ItineraryStep({ itinerary }: any) {
       )}
 
       <div className="grid gap-6">
-        {itinerary.itinerary?.map((day: any, index: number) => (
+        {localItinerary.itinerary?.map((day: any, index: number) => (
           <div key={index} className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">
@@ -381,12 +405,20 @@ function ItineraryStep({ itinerary }: any) {
         ))}
       </div>
 
-      <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white p-6 rounded-xl text-center">
+      <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white p-6 rounded-xl text-center space-y-3">
         <h3 className="text-xl font-bold mb-2">Ready to Book Your Adventure?</h3>
         <p className="mb-4">Your personalized Goa itinerary is ready! Start booking to secure the best deals.</p>
         <button className="bg-white text-orange-500 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
           Start Booking Process
         </button>
+        <div>
+          <button
+            onClick={handleReoptimize}
+            className="mt-2 bg-white/90 text-pink-600 px-6 py-3 rounded-lg font-semibold hover:bg-white transition-colors border border-white"
+          >
+            Re-optimize Itinerary
+          </button>
+        </div>
       </div>
     </motion.div>
   );
