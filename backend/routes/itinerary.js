@@ -433,11 +433,8 @@ class ItineraryOptimizer {
   }
 }
 
-// GET /api/v1/trips/:tripId/itinerary - Get optimized itinerary
-router.get('/:tripId', authenticateUser, [
-  param('tripId').isUUID(),
-  query('include_alternatives').optional().isBoolean()
-], async (req, res) => {
+// Shared handler to generate itinerary
+async function handleGetItinerary(req, res) {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -506,15 +503,19 @@ router.get('/:tripId', authenticateUser, [
       duration
     );
     
-    // Log audit event
-    await pool.query(
-      'SELECT log_audit_event($1, $2, $3, $4)',
-      ['itinerary_generated', 'trip', tripId, JSON.stringify({ 
-        budget_status: result.budget_status,
-        total_cost: result.total_cost,
-        optimization_score: result.optimization_score
-      })]
-    );
+    // Log audit event (best-effort)
+    try {
+      await pool.query(
+        'SELECT log_audit_event($1, $2, $3, $4)',
+        ['itinerary_generated', 'trip', tripId, JSON.stringify({ 
+          budget_status: result.budget_status,
+          total_cost: result.total_cost,
+          optimization_score: result.optimization_score
+        })]
+      );
+    } catch (e) {
+      console.warn('log_audit_event not available, continuing. Error:', e.message);
+    }
     
     const response = {
       trip_id: tripId,
@@ -533,7 +534,19 @@ router.get('/:tripId', authenticateUser, [
     console.error('Error generating itinerary:', error);
     res.status(500).json({ error: 'Failed to generate itinerary' });
   }
-});
+}
+
+// GET /api/v1/itinerary/:tripId - original mount point
+router.get('/:tripId', authenticateUser, [
+  param('tripId').isUUID(),
+  query('include_alternatives').optional().isBoolean()
+], handleGetItinerary);
+
+// GET /api/v1/trips/:tripId/itinerary - alias mount point (frontend calls this)
+router.get('/:tripId/itinerary', authenticateUser, [
+  param('tripId').isUUID(),
+  query('include_alternatives').optional().isBoolean()
+], handleGetItinerary);
 
 // POST /api/v1/trips/:tripId/itinerary/optimize - Re-optimize with new constraints
 router.post('/:tripId/optimize', authenticateUser, [

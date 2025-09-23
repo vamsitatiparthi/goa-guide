@@ -4,7 +4,9 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 const { Pool } = require('pg');
 
 const app = express();
@@ -84,6 +86,8 @@ app.get('/health/db', async (req, res) => {
 
 // API Routes
 app.use('/api/v1/trips', require('./routes/trips'));
+// Also mount itinerary under /api/v1/trips for path /:tripId/itinerary
+app.use('/api/v1/trips', require('./routes/itinerary'));
 app.use('/api/v1/itinerary', require('./routes/itinerary'));
 app.use('/api/v1/events', require('./routes/events'));
 app.use('/api/v1/bookings', require('./routes/bookings'));
