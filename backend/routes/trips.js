@@ -74,6 +74,17 @@ const generateQuestions = (tripData, existingAnswers = {}) => {
     });
   }
   
+  // Number of days for itinerary planning
+  if (!existingAnswers.duration) {
+    questions.push({
+      id: 'duration',
+      text: 'How many days do you want to plan for?',
+      type: 'single_choice',
+      options: ['2','3','4','5','6','7','8','9','10'],
+      required: true
+    });
+  }
+  
   if (!existingAnswers.interests && tripData.trip_type) {
     questions.push({
       id: 'interests',

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { PaperAirplaneIcon, MapPinIcon, CalendarIcon, UsersIcon } from '@heroicons/react/24/outline';
 import toast, { Toaster } from 'react-hot-toast';
@@ -285,6 +286,7 @@ function QuestionsStep({ trip, onSubmit, loading }: any) {
 
 function ItineraryStep({ itinerary }: any) {
   const [localItinerary, setLocalItinerary] = useState(itinerary);
+  const router = useRouter();
 
   const handleReoptimize = async () => {
     try {
@@ -408,7 +410,17 @@ function ItineraryStep({ itinerary }: any) {
       <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white p-6 rounded-xl text-center space-y-3">
         <h3 className="text-xl font-bold mb-2">Ready to Book Your Adventure?</h3>
         <p className="mb-4">Your personalized Goa itinerary is ready! Start booking to secure the best deals.</p>
-        <button className="bg-white text-orange-500 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+        <button
+          onClick={() => {
+            try {
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('goaguide:lastItinerary', JSON.stringify(localItinerary));
+              }
+            } catch {}
+            router.push({ pathname: '/booking', query: { tripId: localItinerary.trip_id } });
+          }}
+          className="bg-white text-orange-500 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+        >
           Start Booking Process
         </button>
         <div>
