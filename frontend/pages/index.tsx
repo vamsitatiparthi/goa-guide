@@ -330,7 +330,7 @@ function ItineraryStep({ itinerary }: any) {
         <h2 className="text-3xl font-bold text-gray-900 mb-4">
           Your Goa Adventure Awaits! 🏖️
         </h2>
-        <div className="flex justify-center items-center space-x-8 text-lg">
+        <div className="flex justify-center items-center space-x-8 text-lg flex-wrap gap-y-3">
           <div className="flex items-center">
             <span className="font-semibold">Total Cost:</span>
             <span className={`ml-2 px-3 py-1 rounded-full text-white ${
@@ -343,6 +343,14 @@ function ItineraryStep({ itinerary }: any) {
             <span className="font-semibold">Optimization Score:</span>
             <span className="ml-2 text-orange-600 font-bold">{localItinerary.optimization_score}/100</span>
           </div>
+          {localItinerary.weather && (
+            <div className="flex items-center">
+              <span className="font-semibold">Weather:</span>
+              <span className="ml-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {Math.round(localItinerary.weather.temperature)}°C · {localItinerary.weather.condition}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
