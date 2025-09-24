@@ -69,14 +69,14 @@ class ItineraryOptimizer {
     return { minutes, distKm: Math.round(distKm * 10) / 10, speed };
   }
 
-  async optimizeItinerary(pois, events, duration = 2) {
+  async optimizeItinerary(pois, events, duration = 2, city = 'Goa') {
     const totalBudget = this.budget * this.partySize;
     
     // Budget allocation strategy
     const budgetAllocation = this.getBudgetAllocation();
     
     // Get weather data for optimization
-    const weather = await this.getWeatherData();
+    const weather = await this.getWeatherData(city);
     
     // Filter and score POIs based on budget and preferences
     const scoredPois = this.scorePOIs(pois, budgetAllocation);
@@ -128,15 +128,16 @@ class ItineraryOptimizer {
     return allocations[this.tripType] || allocations.solo;
   }
 
-  async getWeatherData() {
+  async getWeatherData(city = 'Goa') {
     try {
-      const cacheKey = 'weather_goa';
+      const cityKey = (city || 'Goa').toLowerCase();
+      const cacheKey = `weather_${cityKey}`;
       let weather = cache.get(cacheKey);
       
       const apiKey = process.env.OPENWEATHER_API_KEY || process.env.WEATHER_API_KEY;
       if (!weather && apiKey) {
         const response = await axios.get(
-          `https://api.openweathermap.org/data/2.5/weather?q=Goa,IN&appid=${apiKey}&units=metric`
+          `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`
         );
         
         weather = {
@@ -546,6 +547,7 @@ async function handleGetItinerary(req, res) {
     const responses = trip.questionnaire_responses || {};
     const duration = responses.duration || 2;
     const startDate = responses.start_date; // ISO date string from questionnaire
+    const city = (responses.origin_city || trip.destination || 'Goa') + ', IN';
     const budget = trip.budget_per_person || 5000;
     
     // Initialize optimizer
@@ -560,10 +562,13 @@ async function handleGetItinerary(req, res) {
     const result = await optimizer.optimizeItinerary(
       poisResult.rows,
       eventsResult.rows,
-      duration
+      duration,
+      city
     );
+    
     // Overwrite itinerary dates with selected start date
-    const weather = await optimizer.getWeatherData();
+    const weather = await optimizer.getWeatherData(city);
+    
     result.itinerary = optimizer.generateDayWiseItinerary(
       poisResult.rows,
       eventsResult.rows,
