@@ -133,9 +133,10 @@ class ItineraryOptimizer {
       const cacheKey = 'weather_goa';
       let weather = cache.get(cacheKey);
       
-      if (!weather && process.env.OPENWEATHER_API_KEY) {
+      const apiKey = process.env.OPENWEATHER_API_KEY || process.env.WEATHER_API_KEY;
+      if (!weather && apiKey) {
         const response = await axios.get(
-          `https://api.openweathermap.org/data/2.5/weather?q=Goa,IN&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`
+          `https://api.openweathermap.org/data/2.5/weather?q=Goa,IN&appid=${apiKey}&units=metric`
         );
         
         weather = {
