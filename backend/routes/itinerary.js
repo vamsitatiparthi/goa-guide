@@ -505,11 +505,12 @@ async function handleGetItinerary(req, res) {
       duration
     );
     // Overwrite itinerary dates with selected start date
-    result.itinerary = this.generateDayWiseItinerary(
+    const weather = await optimizer.getWeatherData();
+    result.itinerary = optimizer.generateDayWiseItinerary(
       poisResult.rows,
       eventsResult.rows,
       duration,
-      await this.getWeatherData(),
+      weather,
       startDate
     );
     
