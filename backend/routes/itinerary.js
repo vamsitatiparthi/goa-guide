@@ -36,6 +36,39 @@ class ItineraryOptimizer {
     };
   }
 
+  // --- Traffic-aware helpers (simple, no external APIs) ---
+  haversineKm(lat1, lon1, lat2, lon2) {
+    function toRad(v) { return (v * Math.PI) / 180; }
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // Simple traffic speed profile for Goa (km/h)
+  trafficSpeedKmph(hour24) {
+    // Peak: 9-11, 17-20 -> 20 km/h; otherwise 30 km/h; late night 22-5 -> 35 km/h
+    if (hour24 >= 22 || hour24 <= 5) return 35;
+    if ((hour24 >= 9 && hour24 <= 11) || (hour24 >= 17 && hour24 <= 20)) return 20;
+    return 30;
+  }
+
+  estimateTravelMinutes(from, to, baseDateStr, timeStr) {
+    // from/to: objects with latitude, longitude
+    if (!from || !to || from.latitude == null || to.latitude == null) return null;
+    const distKm = this.haversineKm(from.latitude, from.longitude, to.latitude, to.longitude);
+    // Parse hour from timeStr 'HH:MM'
+    let hour = 9;
+    try { hour = parseInt((timeStr || '09:00').split(':')[0], 10); } catch {}
+    const speed = this.trafficSpeedKmph(hour);
+    const minutes = Math.max(5, Math.round((distKm / speed) * 60));
+    return { minutes, distKm: Math.round(distKm * 10) / 10, speed };
+  }
+
   async optimizeItinerary(pois, events, duration = 2) {
     const totalBudget = this.budget * this.partySize;
     
@@ -70,6 +103,13 @@ class ItineraryOptimizer {
       cost_breakdown: this.costBreakdown,
       alternatives,
       weather_impact: weather.impact,
+      weather: {
+        temperature: weather.temperature,
+        condition: weather.condition,
+        description: weather.description,
+        humidity: weather.humidity,
+        wind_speed: weather.wind_speed,
+      },
       optimization_score: this.calculateOptimizationScore(itinerary, totalCost, totalBudget)
     };
   }
@@ -300,7 +340,24 @@ class ItineraryOptimizer {
       });
     });
     
-    return activities.sort((a, b) => a.time.localeCompare(b.time));
+    // Sort by time and annotate travel time between consecutive activities
+    const sorted = activities.sort((a, b) => a.time.localeCompare(b.time));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+      const travel = this.estimateTravelMinutes(
+        { latitude: prev.activity.latitude, longitude: prev.activity.longitude },
+        { latitude: curr.activity.latitude, longitude: curr.activity.longitude },
+        null,
+        curr.time
+      );
+      if (travel) {
+        const note = `Est. travel: ${travel.minutes} min for ~${travel.distKm} km (traffic-adjusted)`;
+        curr.notes = curr.notes ? `${curr.notes}. ${note}` : note;
+        curr.travel_time_min = travel.minutes;
+      }
+    }
+    return sorted;
   }
 
   getActivityNotes(activity, weather) {
