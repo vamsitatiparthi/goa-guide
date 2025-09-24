@@ -222,10 +222,11 @@ class ItineraryOptimizer {
     }));
   }
 
-  generateDayWiseItinerary(pois, events, duration, weather) {
+  generateDayWiseItinerary(pois, events, duration, weather, startDate) {
     const itinerary = [];
     const selectedPois = pois.slice(0, Math.min(duration * 3, pois.length));
     const poisPerDay = Math.ceil(selectedPois.length / duration);
+    const baseDate = startDate && !isNaN(new Date(startDate)) ? new Date(startDate) : new Date();
     
     for (let day = 1; day <= duration; day++) {
       const dayStart = (day - 1) * poisPerDay;
@@ -240,7 +241,7 @@ class ItineraryOptimizer {
       
       const dayItinerary = {
         day,
-        date: new Date(Date.now() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        date: new Date(baseDate.getTime() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         activities: this.optimizeDayActivities(dayPois, dayEvents, weather),
         estimated_cost: dayPois.reduce((sum, poi) => sum + poi.estimated_cost, 0) +
                        dayEvents.reduce((sum, event) => sum + event.estimated_cost, 0),
@@ -486,6 +487,7 @@ async function handleGetItinerary(req, res) {
     // Extract trip preferences
     const responses = trip.questionnaire_responses || {};
     const duration = responses.duration || 2;
+    const startDate = responses.start_date; // ISO date string from questionnaire
     const budget = trip.budget_per_person || 5000;
     
     // Initialize optimizer
@@ -501,6 +503,14 @@ async function handleGetItinerary(req, res) {
       poisResult.rows,
       eventsResult.rows,
       duration
+    );
+    // Overwrite itinerary dates with selected start date
+    result.itinerary = this.generateDayWiseItinerary(
+      poisResult.rows,
+      eventsResult.rows,
+      duration,
+      await this.getWeatherData(),
+      startDate
     );
     
     // Log audit event (best-effort)

@@ -227,6 +227,16 @@ function QuestionsStep({ trip, onSubmit, loading }: any) {
                 required={question.required}
               />
             )}
+
+            {question.type === 'date' && (
+              <input
+                type="date"
+                value={answers[question.id] || ''}
+                onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-0"
+                required={question.required}
+              />
+            )}
             
             {question.type === 'single_choice' && (
               <div className="space-y-2">

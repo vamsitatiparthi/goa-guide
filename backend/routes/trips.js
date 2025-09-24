@@ -36,11 +36,20 @@ const validateAnswers = [
 const generateQuestions = (tripData, existingAnswers = {}) => {
   const questions = [];
   
-  if (!existingAnswers.travel_dates) {
+  // Trip date range (start and end)
+  if (!existingAnswers.start_date) {
     questions.push({
-      id: 'travel_dates',
-      text: 'When would you like to travel? (e.g., "Feb 15-17, 2024")',
-      type: 'text',
+      id: 'start_date',
+      text: 'When does your trip start?',
+      type: 'date',
+      required: true
+    });
+  }
+  if (!existingAnswers.end_date) {
+    questions.push({
+      id: 'end_date',
+      text: 'When does your trip end?',
+      type: 'date',
       required: true
     });
   }
@@ -74,16 +83,7 @@ const generateQuestions = (tripData, existingAnswers = {}) => {
     });
   }
   
-  // Number of days for itinerary planning
-  if (!existingAnswers.duration) {
-    questions.push({
-      id: 'duration',
-      text: 'How many days do you want to plan for?',
-      type: 'single_choice',
-      options: ['2','3','4','5','6','7','8','9','10'],
-      required: true
-    });
-  }
+  // Duration will be computed from start/end dates; no separate duration question
   
   if (!existingAnswers.interests && tripData.trip_type) {
     questions.push({
@@ -256,6 +256,16 @@ router.post('/:tripId/answers', authenticateUser, validateAnswers, async (req, r
     const trip = tripResult.rows[0];
     const currentResponses = trip.questionnaire_responses || {};
     const updatedResponses = { ...currentResponses, ...answers };
+    // If both dates present, compute duration (end exclusive)
+    if (updatedResponses.start_date && updatedResponses.end_date) {
+      const start = new Date(updatedResponses.start_date);
+      const end = new Date(updatedResponses.end_date);
+      if (!isNaN(start) && !isNaN(end) && end > start) {
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const days = Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);
+        updatedResponses.duration = Math.max(1, days);
+      }
+    }
     
     // Update trip with new answers
     const updateQuery = `
