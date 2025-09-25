@@ -346,13 +346,27 @@ function ItineraryStep({ itinerary }: any) {
           {localItinerary.weather && (
             <div className="flex items-center">
               <span className="font-semibold">Weather:</span>
-              <span className="ml-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                {Math.round(localItinerary.weather.temperature)}°C · {localItinerary.weather.condition}
-              </span>
+              <div className="ml-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  {Math.round(localItinerary.weather.temperature)}°C · {localItinerary.weather.condition}
+                </div>
+                {localItinerary.weather.description && (
+                  <div className="text-sm text-blue-700/80 mt-1">
+                    {localItinerary.weather.description}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {localItinerary.narrative && (
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">GoaGuide Summary</h3>
+          <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed">{localItinerary.narrative}</pre>
+        </div>
+      )}
 
       {localItinerary.budget_status === 'over_budget' && localItinerary.alternatives?.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
