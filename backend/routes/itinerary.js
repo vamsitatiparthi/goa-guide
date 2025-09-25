@@ -69,7 +69,7 @@ class ItineraryOptimizer {
     return { minutes, distKm: Math.round(distKm * 10) / 10, speed };
   }
 
-  async optimizeItinerary(pois, events, duration = 2, city = 'Goa') {
+  async optimizeItinerary(pois, events, duration = 2, city = 'Goa', startDate) {
     const totalBudget = this.budget * this.partySize;
     
     // Budget allocation strategy
@@ -84,8 +84,8 @@ class ItineraryOptimizer {
     // Filter relevant events
     const relevantEvents = this.filterEvents(events);
     
-    // Generate day-wise itinerary
-    const itinerary = this.generateDayWiseItinerary(scoredPois, relevantEvents, duration, weather);
+    // Generate day-wise itinerary (use startDate for correct dates)
+    const itinerary = this.generateDayWiseItinerary(scoredPois, relevantEvents, duration, weather, startDate);
     
     // Calculate total cost and check budget
     const totalCost = this.calculateTotalCost(itinerary);
@@ -565,17 +565,7 @@ async function handleGetItinerary(req, res) {
       duration,
       city
     );
-    
-    // Overwrite itinerary dates with selected start date
-    const weather = await optimizer.getWeatherData(city);
-    
-    result.itinerary = optimizer.generateDayWiseItinerary(
-      poisResult.rows,
-      eventsResult.rows,
-      duration,
-      weather,
-      startDate
-    );
+    // Itinerary already generated within optimizeItinerary with proper costs and startDate
     
     // Log audit event (best-effort)
     try {
