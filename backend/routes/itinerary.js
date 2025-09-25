@@ -265,15 +265,30 @@ class ItineraryOptimizer {
   }
 
   estimatePOICost(poi) {
+    // Base by price range (per person)
     const baseCosts = {
       free: 0,
-      budget: 200,
-      mid_range: 500,
-      luxury: 1000
+      budget: 250,
+      mid_range: 700,
+      luxury: 1400
     };
-    
-    const baseCost = baseCosts[poi.price_range] || baseCosts.budget;
-    return baseCost * this.partySize;
+    // Category multipliers to make totals more realistic (per person)
+    const cat = (poi.category || '').toLowerCase();
+    const multipliers = {
+      beach: 0.8,            // parking, snacks, rentals
+      historical: 0.5,       // tickets are usually cheap
+      religious: 0.4,
+      nature: 0.9,           // park entries, guides
+      adventure: 1.6,        // activities like water sports
+      entertainment: 1.2,    // clubs, events
+      market: 0.6,           // small spends
+      shopping: 0.6
+    };
+    const mult = multipliers[cat] || 1.0;
+
+    const base = baseCosts[poi.price_range] != null ? baseCosts[poi.price_range] : 300;
+    const perPerson = Math.round(base * mult);
+    return perPerson * this.partySize;
   }
 
   getTripTypeScore(poi, tripType) {
@@ -329,12 +344,20 @@ class ItineraryOptimizer {
         return eventDate.getDate() === (new Date().getDate() + day - 1);
       });
       
+      // Build activities then compute transport cost between them
+      const activities = this.optimizeDayActivities(dayPois, dayEvents, weather);
+      const transportRatePerKm = 20; // INR per km (approx local taxi/scooter fuel)
+      const dayTransportKm = activities.reduce((sum, a) => sum + (a.travel_dist_km || 0), 0);
+      const transportCost = Math.round(dayTransportKm * transportRatePerKm);
+
       const dayItinerary = {
         day,
         date: new Date(baseDate.getTime() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        activities: this.optimizeDayActivities(dayPois, dayEvents, weather),
+        activities,
         estimated_cost: dayPois.reduce((sum, poi) => sum + poi.estimated_cost, 0) +
-                       dayEvents.reduce((sum, event) => sum + event.estimated_cost, 0),
+                       dayEvents.reduce((sum, event) => sum + event.estimated_cost, 0) +
+                       transportCost,
+        transport_cost: transportCost,
         weather_recommendation: this.getDayWeatherRecommendation(weather, day)
       };
       
@@ -405,6 +428,7 @@ class ItineraryOptimizer {
         const note = `Est. travel: ${travel.minutes} min for ~${travel.distKm} km (traffic-adjusted)`;
         curr.notes = curr.notes ? `${curr.notes}. ${note}` : note;
         curr.travel_time_min = travel.minutes;
+        curr.travel_dist_km = travel.distKm;
       }
     }
     return sorted;
