@@ -368,6 +368,21 @@ function ItineraryStep({ itinerary }: any) {
         </div>
       )}
 
+      {localItinerary.stay_suggestions && localItinerary.stay_suggestions.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Where to Stay</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {localItinerary.stay_suggestions.map((s: any, idx: number) => (
+              <div key={idx} className="border rounded-lg p-4 bg-orange-50 border-orange-200">
+                <div className="font-semibold text-orange-800">{s.area}</div>
+                <div className="text-sm text-orange-900/80">{s.why}</div>
+                <div className="text-xs text-orange-700 mt-1">Best for: {s.good_for}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {localItinerary.budget_status === 'over_budget' && localItinerary.alternatives?.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-yellow-800 mb-2">
@@ -396,10 +411,12 @@ function ItineraryStep({ itinerary }: any) {
                 Day {day.day} - {new Date(day.date).toLocaleDateString()}
               </h3>
               <div className="text-right">
-                <div className="text-lg font-semibold text-orange-600">
-                  ₹{day.estimated_cost?.toLocaleString()}
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-orange-600">
+                    ₹{day.estimated_cost?.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">includes transport ₹{(day.transport_cost || 0).toLocaleString?.() ?? '0'}</div>
                 </div>
-                <div className="text-sm text-gray-500">per day</div>
               </div>
             </div>
 
@@ -410,28 +427,37 @@ function ItineraryStep({ itinerary }: any) {
             )}
 
             <div className="space-y-4">
-              {day.activities?.map((activity: any, actIndex: number) => (
-                <div key={actIndex} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="text-sm font-medium text-gray-500 min-w-[60px]">
-                    {activity.time}
-                  </div>
+              {day.activities?.map((activity: any, idx: number) => (
+                <div key={idx} className="flex items-start justify-between py-3 border-b last:border-0">
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">
-                      {activity.activity.name || activity.activity.title}
-                    </h4>
-                    <p className="text-gray-600 text-sm mb-2">
-                      {activity.activity.description}
-                    </p>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Duration: {activity.duration}</span>
-                      <span className="font-medium text-orange-600">
-                        ₹{activity.activity.estimated_cost || 0}
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span>{activity.time}</span>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
+                        activity.time < '12:00' ? 'bg-green-50 text-green-700 border border-green-200' :
+                        activity.time < '18:00' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                        'bg-purple-50 text-purple-700 border border-purple-200'
+                      }`}>
+                        {activity.time < '12:00' ? 'Morning' : activity.time < '18:00' ? 'Afternoon' : 'Evening'}
                       </span>
+                    </div>
+                    <div className="font-semibold text-gray-900">
+                      {activity.activity?.name || activity.activity?.title}
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {activity.activity?.description}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="text-xs text-gray-500">Duration: {activity.duration}</span>
+                      <span className="text-xs text-gray-500">Cost: ₹{(activity.activity?.estimated_cost || 0).toLocaleString?.() ?? '0'}</span>
+                      {activity.travel_time_min && (
+                        <span className="text-xs text-gray-500">Travel: {activity.travel_time_min} min</span>
+                      )}
                     </div>
                     {activity.notes && (
                       <p className="text-xs text-blue-600 mt-1">💡 {activity.notes}</p>
                     )}
                   </div>
+                  <div className="text-right"></div>
                 </div>
               ))}
             </div>
