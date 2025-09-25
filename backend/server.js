@@ -26,20 +26,41 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet());
 app.use(compression());
-// CORS with multi-origin support via comma-separated CORS_ORIGIN
+// CORS with multi-origin and wildcard support via comma-separated CORS_ORIGIN
+// Example: CORS_ORIGIN="https://goa-guide.vercel.app,*.vercel.app,http://localhost:3000"
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 
+function isOriginAllowed(origin) {
+  if (!origin) return true; // allow non-browser tools
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    const hostname = new URL(origin).hostname;
+    for (const pattern of allowedOrigins) {
+      if (pattern.startsWith('*.')) {
+        const base = pattern.slice(2); // remove '*.'
+        if (hostname === base || hostname.endsWith('.' + base)) return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow non-browser tools
-    const ok = allowedOrigins.includes(origin);
+    const ok = isOriginAllowed(origin);
     return callback(null, ok);
   },
   credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-user-id','x-trace-id'],
+  optionsSuccessStatus: 204,
 }));
+
+// Explicitly handle preflight for all routes
+app.options('*', cors());
 
 // Rate limiting
 const limiter = rateLimit({
