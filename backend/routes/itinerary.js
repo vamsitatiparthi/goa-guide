@@ -36,6 +36,51 @@ class ItineraryOptimizer {
     };
   }
 
+  // Build a concise GoaGuide AI-style narrative from the computed itinerary
+  buildNarrative(itinerary, totalCost) {
+    try {
+      const lines = [];
+      const highlightsSet = new Set();
+
+      for (const day of itinerary) {
+        // Try to map morning/afternoon/evening from activities by time
+        const acts = (day.activities || []).slice().sort((a,b)=>a.time.localeCompare(b.time));
+        const morning = acts.find(a => a.time < '12:00');
+        const afternoon = acts.find(a => a.time >= '12:00' && a.time < '18:00');
+        const evening = acts.find(a => a.time >= '18:00') || acts.find(a => a.type === 'event');
+
+        const names = [morning, afternoon, evening]
+          .filter(Boolean)
+          .map(a => a.activity?.name || a.activity?.title)
+          .filter(Boolean);
+
+        if (names.length > 0) {
+          lines.push(`Day ${day.day}: ${names.join(' → ')}.`);
+        }
+
+        // Collect highlights from categories
+        for (const a of acts) {
+          const cat = (a.activity?.category || '').toLowerCase();
+          if (/beach/.test(cat)) highlightsSet.add('beaches');
+          if (/historical|church|fort|heritage|religious/.test(cat)) highlightsSet.add('culture');
+          if (/entertainment|night/.test(cat)) highlightsSet.add('nightlife');
+          if (/market|shopping/.test(cat)) highlightsSet.add('shopping');
+          if (/nature|adventure/.test(cat)) highlightsSet.add('nature');
+          if (/food|cuisine|restaurant|shack/.test(a.activity?.description || '')) highlightsSet.add('food');
+        }
+      }
+
+      const highlights = Array.from(highlightsSet).slice(0,3).join(' + ') || 'local experiences';
+      const costStr = `Cost: ~₹${Math.round(totalCost).toLocaleString('en-IN')}`;
+      const tips = 'Tips: carry cash for markets, keep sunscreen, and try local shacks.';
+
+      const summary = `${lines.join('\n')}\n${costStr} | Highlights: ${highlights}.\n${tips}`;
+      return summary;
+    } catch {
+      return '';
+    }
+  }
+
   // --- Traffic-aware helpers (simple, no external APIs) ---
   haversineKm(lat1, lon1, lat2, lon2) {
     function toRad(v) { return (v * Math.PI) / 180; }
@@ -95,6 +140,8 @@ class ItineraryOptimizer {
     const alternatives = budgetStatus === 'over_budget' ? 
       this.generateBudgetAlternatives(itinerary, totalBudget) : [];
 
+    const narrative = this.buildNarrative(itinerary, totalCost);
+
     return {
       itinerary,
       budget_status: budgetStatus,
@@ -110,7 +157,8 @@ class ItineraryOptimizer {
         humidity: weather.humidity,
         wind_speed: weather.wind_speed,
       },
-      optimization_score: this.calculateOptimizationScore(itinerary, totalCost, totalBudget)
+      optimization_score: this.calculateOptimizationScore(itinerary, totalCost, totalBudget),
+      narrative
     };
   }
 
