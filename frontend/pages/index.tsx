@@ -372,13 +372,21 @@ function ItineraryStep({ itinerary }: any) {
         <div className="bg-white rounded-xl shadow-sm border p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">Where to Stay</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {localItinerary.stay_suggestions.map((s: any, idx: number) => (
-              <div key={idx} className="border rounded-lg p-4 bg-orange-50 border-orange-200">
-                <div className="font-semibold text-orange-800">{s.area}</div>
-                <div className="text-sm text-orange-900/80">{s.why}</div>
-                <div className="text-xs text-orange-700 mt-1">Best for: {s.good_for}</div>
-              </div>
-            ))}
+            {localItinerary.stay_suggestions.map((s: any, idx: number) => {
+              const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(s.area + ', Goa')}`;
+              const hotelsUrl = `https://www.google.com/travel/hotels/${encodeURIComponent(s.area + ', Goa')}`;
+              return (
+                <div key={idx} className="border rounded-lg p-4 bg-orange-50 border-orange-200">
+                  <div className="font-semibold text-orange-800">{s.area}</div>
+                  <div className="text-sm text-orange-900/80">{s.why}</div>
+                  <div className="text-xs text-orange-700 mt-1">Best for: {s.good_for}</div>
+                  <div className="mt-3 flex gap-2">
+                    <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-orange-700 border border-orange-300 hover:bg-orange-100">Open in Maps</a>
+                    <a href={hotelsUrl} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-pink-700 border border-pink-300 hover:bg-pink-100">Find Hotels</a>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
