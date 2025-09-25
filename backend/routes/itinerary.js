@@ -3,6 +3,7 @@ const { param, query, body, validationResult } = require('express-validator');
 const { Pool } = require('pg');
 const NodeCache = require('node-cache');
 const axios = require('axios');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
@@ -36,6 +37,51 @@ class ItineraryOptimizer {
     };
   }
 
+  async refineNarrativeWithLLM(narrative, context) {
+    try {
+      const apiKey = process.env.FREE_AI_API_KEY;
+      const apiUrl = process.env.FREE_AI_API_URL; // e.g., https://api.openrouter.ai/v1 or any OpenAI-compatible endpoint
+      const model = process.env.FREE_AI_MODEL || 'gpt-3.5-turbo';
+      if (!apiKey || !apiUrl) return null;
+
+      const cacheKey = 'narr_' + crypto.createHash('sha1').update((narrative || '') + '|' + (context || '')).digest('hex');
+      const cached = cache.get(cacheKey);
+      if (cached) return cached;
+
+      // OpenAI-compatible Chat Completions request body
+      const body = {
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are GoaGuide AI, a friendly local travel planner for Goa. Rewrite the itinerary narrative to be clear, concise, and helpful. Keep it short and practical. Use the style: Day X: A → B → C. End with a single-line cost and 2-3 highlights, then one short tip line.'
+          },
+          {
+            role: 'user',
+            content: `Context:\n${context}\n\nOriginal narrative:\n${narrative}`
+          }
+        ],
+        temperature: 0.6,
+        max_tokens: 300
+      };
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      };
+
+      const resp = await axios.post(`${apiUrl.replace(/\/$/, '')}/chat/completions`, body, { headers, timeout: 10000 });
+      const text = resp.data?.choices?.[0]?.message?.content?.trim();
+      if (text) {
+        cache.set(cacheKey, text, 3600); // cache 1 hour
+        return text;
+      }
+      return null;
+    } catch (e) {
+      console.warn('LLM refine failed, using deterministic narrative. Error:', e.message);
+      return null;
+    }
+  }
   // Local-guide style stay suggestions based on interests and trip type
   getStaySuggestions(preferences = {}, tripType = 'solo') {
     const interests = (preferences.interests || []).map(s => (s || '').toLowerCase());
@@ -171,7 +217,11 @@ class ItineraryOptimizer {
     const alternatives = budgetStatus === 'over_budget' ? 
       this.generateBudgetAlternatives(itinerary, totalBudget) : [];
 
-    const narrative = this.buildNarrative(itinerary, totalCost);
+    let narrative = this.buildNarrative(itinerary, totalCost);
+    // Optional LLM refinement if FREE_AI_API_KEY and FREE_AI_API_URL provided
+    const ctx = `City: ${city}\nDuration: ${duration} days\nTrip type: ${this.tripType}\nInterests: ${(this.preferences.interests || []).join(', ') || 'N/A'}\nBudget per person: ₹${this.budget}`;
+    const llm = await this.refineNarrativeWithLLM(narrative, ctx);
+    if (llm) narrative = llm;
     const stay_suggestions = this.getStaySuggestions(this.preferences, this.tripType);
 
     return {
@@ -321,7 +371,21 @@ class ItineraryOptimizer {
 
     const base = baseCosts[poi.price_range] != null ? baseCosts[poi.price_range] : 300;
     const perPerson = Math.round(base * mult);
-    return perPerson * this.partySize;
+    // Category-specific minimums (per person) for realistic nominal spends
+    const mins = {
+      beach: 150,
+      historical: 50,
+      religious: 0,
+      nature: 100,
+      adventure: 600,
+      entertainment: 250,
+      market: 150,
+      shopping: 150,
+      default: 100
+    };
+    const minForCat = mins[cat] != null ? mins[cat] : mins.default;
+    const finalPerPerson = Math.max(perPerson, minForCat);
+    return finalPerPerson * this.partySize;
   }
 
   getTripTypeScore(poi, tripType) {
@@ -354,10 +418,21 @@ class ItineraryOptimizer {
     const now = new Date();
     const futureEvents = events.filter(event => new Date(event.start_date) > now);
     
-    return futureEvents.map(event => ({
-      ...event,
-      estimated_cost: (event.price || 0) * this.partySize
-    }));
+    return futureEvents.map(event => {
+      const title = (event.title || '').toLowerCase();
+      const desc = (event.description || '').toLowerCase();
+      // Infer a nominal min spend per person when price is 0/unknown
+      let inferredMin = 50; // base minimum
+      if (/market/.test(title) || /market/.test(desc)) inferredMin = 100;
+      if (/music|fest|concert|night/.test(title) || /music|fest|concert|night/.test(desc)) inferredMin = 200;
+      if (/cruise/.test(title) || /cruise/.test(desc)) inferredMin = 300;
+      const base = event.price || 0;
+      const perPerson = Math.max(base, inferredMin);
+      return {
+        ...event,
+        estimated_cost: perPerson * this.partySize,
+      };
+    });
   }
 
   generateDayWiseItinerary(pois, events, duration, weather, startDate) {
