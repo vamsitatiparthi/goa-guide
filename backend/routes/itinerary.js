@@ -36,6 +36,36 @@ class ItineraryOptimizer {
     };
   }
 
+  // Local-guide style stay suggestions based on interests and trip type
+  getStaySuggestions(preferences = {}, tripType = 'solo') {
+    const interests = (preferences.interests || []).map(s => (s || '').toLowerCase());
+    const picks = [];
+    const push = (area, why, good_for) => picks.push({ area, why, good_for });
+
+    const likesBeaches = interests.some(i => /beach/.test(i));
+    const likesNight = interests.some(i => /night/.test(i));
+    const likesCulture = interests.some(i => /(historical|culture|church|fort)/.test(i));
+    const likesFood = interests.some(i => /(food|cuisine)/.test(i));
+    const likesNature = interests.some(i => /(nature|wildlife|adventure)/.test(i));
+
+    if (likesBeaches || ['friends','couple'].includes(tripType)) {
+      push('Baga / Calangute', 'Lively beaches, shacks, water sports and easy transfers', 'beaches · nightlife');
+      push('Candolim / Sinquerim', 'Quieter stretch but close to all action', 'couples · relaxed vibe');
+    }
+    if (likesNight) {
+      push('Anjuna / Vagator', 'Clubs, sundowners and cliff-side views', 'nightlife · sunsets');
+    }
+    if (likesCulture || likesFood) {
+      push('Panjim / Altinho', 'Central, heritage lanes and great local eateries', 'culture · food walks');
+    }
+    if (likesNature) {
+      push('Colva / Palolem (South Goa)', 'Laid-back beaches and greener landscapes', 'slow travel · families');
+    }
+    if (picks.length === 0) {
+      push('Candolim', 'Balanced access to beaches, forts and restaurants', 'first-time visitors');
+    }
+    return picks.slice(0,4);
+  }
   // Build a concise GoaGuide AI-style narrative from the computed itinerary
   buildNarrative(itinerary, totalCost) {
     try {
@@ -55,6 +85,7 @@ class ItineraryOptimizer {
           .filter(Boolean);
 
         if (names.length > 0) {
+          // Keep it concise, friendly, like a local friend
           lines.push(`Day ${day.day}: ${names.join(' → ')}.`);
         }
 
@@ -71,10 +102,10 @@ class ItineraryOptimizer {
       }
 
       const highlights = Array.from(highlightsSet).slice(0,3).join(' + ') || 'local experiences';
-      const costStr = `Cost: ~₹${Math.round(totalCost).toLocaleString('en-IN')}`;
-      const tips = 'Tips: carry cash for markets, keep sunscreen, and try local shacks.';
+      const costStr = `💰 Cost: ~₹${Math.round(totalCost).toLocaleString('en-IN')}`;
+      const tips = '🧭 Tips: carry cash for markets, keep sunscreen, and try local shacks';
 
-      const summary = `${lines.join('\n')}\n${costStr} | Highlights: ${highlights}.\n${tips}`;
+      const summary = `${lines.join('\n')}\n${costStr} | 🌟 Highlights: ${highlights}\n${tips}`;
       return summary;
     } catch {
       return '';
@@ -141,6 +172,7 @@ class ItineraryOptimizer {
       this.generateBudgetAlternatives(itinerary, totalBudget) : [];
 
     const narrative = this.buildNarrative(itinerary, totalCost);
+    const stay_suggestions = this.getStaySuggestions(this.preferences, this.tripType);
 
     return {
       itinerary,
@@ -158,7 +190,8 @@ class ItineraryOptimizer {
         wind_speed: weather.wind_speed,
       },
       optimization_score: this.calculateOptimizationScore(itinerary, totalCost, totalBudget),
-      narrative
+      narrative,
+      stay_suggestions
     };
   }
 
@@ -350,6 +383,8 @@ class ItineraryOptimizer {
       const dayTransportKm = activities.reduce((sum, a) => sum + (a.travel_dist_km || 0), 0);
       const transportCost = Math.round(dayTransportKm * transportRatePerKm);
 
+      const dailyBudget = Math.round((this.budget * this.partySize) / Math.max(1, duration));
+
       const dayItinerary = {
         day,
         date: new Date(baseDate.getTime() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -360,6 +395,19 @@ class ItineraryOptimizer {
         transport_cost: transportCost,
         weather_recommendation: this.getDayWeatherRecommendation(weather, day)
       };
+
+      // Keep recommendations within per-day budget by trimming lowest-priority late activities
+      // Priority order: keep morning, then afternoon, then evening if over budget
+      const costOf = (a) => (a.activity?.estimated_cost || 0);
+      if (dayItinerary.estimated_cost > dailyBudget && dayItinerary.activities.length > 1) {
+        // Try removing the last (usually evening) activity first
+        let pruned = [...dayItinerary.activities];
+        while (pruned.length > 1 && dayItinerary.estimated_cost > dailyBudget) {
+          const last = pruned.pop();
+          dayItinerary.estimated_cost -= costOf(last);
+        }
+        dayItinerary.activities = pruned;
+      }
       
       itinerary.push(dayItinerary);
     }
