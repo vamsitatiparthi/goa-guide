@@ -19,21 +19,44 @@ export default function Home() {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/trips`, {
-        destination: 'Goa',
-        input_text: inputText,
-        party_size: 2,
-        trip_type: 'family'
-      }, {
-        headers: {
-          'x-user-id': 'demo-user-123',
-          'Content-Type': 'application/json'
-        }
+      // 1) Parse intent from free text
+      const parseRes = await axios.post(`${API_BASE_URL}/intent/parse`, { text: inputText }, {
+        headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
       });
+      const parsed = parseRes.data?.parsed || {};
 
-      setTrip(response.data);
-      setCurrentStep('questions');
-      toast.success('Trip created! Let\'s plan your perfect Goa adventure!');
+      // 2) Create trip with parsed basics
+      const tripRes = await axios.post(`${API_BASE_URL}/trips`, {
+        destination: parsed.destination || 'Goa',
+        input_text: inputText,
+        party_size: parsed.party_size || 2,
+        trip_type: parsed.trip_type || 'family',
+        budget_per_person: parsed.budget_per_person || 5000
+      }, {
+        headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
+      });
+      const createdTrip = tripRes.data;
+
+      // 3) Auto-submit answers (dates, interests)
+      const answers: any = {};
+      if (parsed.start_date) answers.start_date = parsed.start_date;
+      if (parsed.end_date) answers.end_date = parsed.end_date;
+      if (parsed.duration_days) answers.duration = parsed.duration_days; // backend will recompute if dates present
+      if (parsed.interests && parsed.interests.length) answers.interests = parsed.interests;
+
+      if (Object.keys(answers).length > 0) {
+        await axios.post(`${API_BASE_URL}/trips/${createdTrip.id}/answers`, { answers }, {
+          headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 4) Fetch itinerary immediately
+      const itineraryRes = await axios.get(`${API_BASE_URL}/trips/${createdTrip.id}/itinerary`, {
+        headers: { 'x-user-id': 'demo-user-123' }
+      });
+      setTrip({ ...createdTrip, itinerary: itineraryRes.data });
+      setCurrentStep('itinerary');
+      toast.success('Your itinerary is ready!');
     } catch (error) {
       console.error('Error creating trip:', error);
       toast.error('Failed to create trip. Please try again.');
