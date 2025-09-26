@@ -758,7 +758,8 @@ async function handleGetItinerary(req, res) {
       poisResult.rows,
       eventsResult.rows,
       duration,
-      city
+      city,
+      startDate
     );
     // Itinerary already generated within optimizeItinerary with proper costs and startDate
     

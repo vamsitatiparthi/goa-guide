@@ -12,6 +12,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [trip, setTrip] = useState(null);
   const [currentStep, setCurrentStep] = useState('input'); // input, questions, itinerary
+  const [draft, setDraft] = useState<any>(null); // parsed fields waiting user confirmation
 
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +25,25 @@ export default function Home() {
         headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
       });
       const parsed = parseRes.data?.parsed || {};
+
+      // If basic essentials are missing, ask user to confirm them first
+      const needsDates = !(parsed.start_date && parsed.end_date) && !parsed.duration_days;
+      const needsBudget = !parsed.budget_per_person;
+      if (needsDates || needsBudget) {
+        setDraft({
+          destination: parsed.destination || 'Goa',
+          party_size: parsed.party_size || 2,
+          trip_type: parsed.trip_type || 'family',
+          interests: parsed.interests || [],
+          start_date: parsed.start_date || '',
+          end_date: parsed.end_date || '',
+          duration_days: parsed.duration_days || 2,
+          budget_per_person: parsed.budget_per_person || 5000,
+          input_text: inputText,
+        });
+        toast('Please confirm basics to continue');
+        return; // wait for confirmation submit
+      }
 
       // 2) Create trip with parsed basics
       const tripRes = await axios.post(`${API_BASE_URL}/trips`, {
@@ -60,6 +80,50 @@ export default function Home() {
     } catch (error) {
       console.error('Error creating trip:', error);
       toast.error('Failed to create trip. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmBasics = async () => {
+    if (!draft) return;
+    setLoading(true);
+    try {
+      // Create trip from draft
+      const tripRes = await axios.post(`${API_BASE_URL}/trips`, {
+        destination: draft.destination,
+        input_text: draft.input_text,
+        party_size: draft.party_size,
+        trip_type: draft.trip_type,
+        budget_per_person: draft.budget_per_person
+      }, { headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' } });
+      const createdTrip = tripRes.data;
+
+      // Build answers
+      const answers: any = {};
+      if (draft.start_date) answers.start_date = draft.start_date;
+      if (draft.end_date) answers.end_date = draft.end_date;
+      if (!answers.start_date || !answers.end_date) {
+        if (draft.duration_days) answers.duration = draft.duration_days;
+      }
+      if (draft.interests?.length) answers.interests = draft.interests;
+
+      if (Object.keys(answers).length > 0) {
+        await axios.post(`${API_BASE_URL}/trips/${createdTrip.id}/answers`, { answers }, {
+          headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
+        });
+      }
+
+      const itineraryRes = await axios.get(`${API_BASE_URL}/trips/${createdTrip.id}/itinerary`, {
+        headers: { 'x-user-id': 'demo-user-123' }
+      });
+      setTrip({ ...createdTrip, itinerary: itineraryRes.data });
+      setCurrentStep('itinerary');
+      setDraft(null);
+      toast.success('Your itinerary is ready!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to create trip');
     } finally {
       setLoading(false);
     }
@@ -158,6 +222,69 @@ export default function Home() {
                 </button>
               </div>
             </form>
+
+            {draft && (
+              <div className="mt-4 max-w-2xl mx-auto">
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 text-orange-800 border border-orange-200 text-sm">
+                    <span className="font-semibold">Dates:</span>
+                    {draft.start_date && draft.end_date
+                      ? `${new Date(draft.start_date).toLocaleDateString()} → ${new Date(draft.end_date).toLocaleDateString()}`
+                      : `${draft.duration_days || 2} days`}
+                  </span>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-sm">
+                    <span className="font-semibold">People:</span>
+                    {draft.party_size}
+                  </span>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 text-green-800 border border-green-200 text-sm">
+                    <span className="font-semibold">Budget:</span>
+                    ₹{(draft.budget_per_person || 0).toLocaleString()}/person
+                  </span>
+                  {Array.isArray(draft.interests) && draft.interests.length > 0 && (
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200 text-sm">
+                      <span className="font-semibold">Interests:</span>
+                      {draft.interests.join(', ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {draft && (
+              <div className="mt-6 max-w-2xl mx-auto text-left bg-white border rounded-xl p-4">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Confirm basics</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-gray-600">Start date</label>
+                    <input type="date" value={draft.start_date}
+                      onChange={(e)=>setDraft({ ...draft, start_date: e.target.value })}
+                      className="w-full p-2 border rounded-lg" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">End date</label>
+                    <input type="date" value={draft.end_date}
+                      onChange={(e)=>setDraft({ ...draft, end_date: e.target.value })}
+                      className="w-full p-2 border rounded-lg" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">OR Duration (days)</label>
+                    <input type="number" min={1} max={14} value={draft.duration_days}
+                      onChange={(e)=>setDraft({ ...draft, duration_days: parseInt(e.target.value||'0',10) })}
+                      className="w-full p-2 border rounded-lg" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Budget per person (₹)</label>
+                    <input type="number" min={1000} step={100} value={draft.budget_per_person}
+                      onChange={(e)=>setDraft({ ...draft, budget_per_person: parseInt(e.target.value||'0',10) })}
+                      className="w-full p-2 border rounded-lg" />
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-3">
+                  <button onClick={()=>setDraft(null)} className="px-4 py-2 rounded-lg border">Cancel</button>
+                  <button onClick={handleConfirmBasics} disabled={loading} className="px-4 py-2 rounded-lg bg-orange-500 text-white">Continue</button>
+                </div>
+              </div>
+            )}
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
               <FeatureCard
