@@ -114,6 +114,7 @@ app.use('/api/v1/events', require('./routes/events'));
 app.use('/api/v1/bookings', require('./routes/bookings'));
 app.use('/api/v1/photos', require('./routes/photos'));
 app.use('/provider/api/v1', require('./routes/provider'));
+app.use('/api/v1/intent', require('./routes/intent'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
