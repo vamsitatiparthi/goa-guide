@@ -217,11 +217,6 @@ class ItineraryOptimizer {
     const alternatives = budgetStatus === 'over_budget' ? 
       this.generateBudgetAlternatives(itinerary, totalBudget) : [];
 
-    let narrative = this.buildNarrative(itinerary, totalCost);
-    // Optional LLM refinement if FREE_AI_API_KEY and FREE_AI_API_URL provided
-    const ctx = `City: ${city}\nDuration: ${duration} days\nTrip type: ${this.tripType}\nInterests: ${(this.preferences.interests || []).join(', ') || 'N/A'}\nBudget per person: ₹${this.budget}`;
-    const llm = await this.refineNarrativeWithLLM(narrative, ctx);
-    if (llm) narrative = llm;
     const stay_suggestions = this.getStaySuggestions(this.preferences, this.tripType);
 
     return {
@@ -240,7 +235,6 @@ class ItineraryOptimizer {
         wind_speed: weather.wind_speed,
       },
       optimization_score: this.calculateOptimizationScore(itinerary, totalCost, totalBudget),
-      narrative,
       stay_suggestions
     };
   }
