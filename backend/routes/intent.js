@@ -26,12 +26,12 @@ function parseHeuristics(text) {
     first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8,
     ninth: 9, nineth: 9, tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14,
     fifteenth: 15, sixteenth: 16, seventeenth: 17, eighteenth: 18, nineteenth: 19,
-    twentieth: 20, twentyfirst: 21, twentyfirsth: 21, twenty-first: 21,
-    twentysecond: 22, twenty-second: 22, twentythird: 23, twenty-third: 23,
-    twentyfourth: 24, twenty-fourth: 24, twentyfifth: 25, twenty-fifth: 25,
-    twentysixth: 26, twenty-sixth: 26, twentyseventh: 27, twenty-seventh: 27,
-    twentyeighth: 28, twenty-eighth: 28, twentyninth: 29, twenty-ninth: 29,
-    thirtieth: 30, thirtyfirst: 31, thirty-first: 31
+    twentieth: 20, twentyfirst: 21, 'twenty-first': 21,
+    twentysecond: 22, 'twenty-second': 22, twentythird: 23, 'twenty-third': 23,
+    twentyfourth: 24, 'twenty-fourth': 24, twentyfifth: 25, 'twenty-fifth': 25,
+    twentysixth: 26, 'twenty-sixth': 26, twentyseventh: 27, 'twenty-seventh': 27,
+    twentyeighth: 28, 'twenty-eighth': 28, twentyninth: 29, 'twenty-ninth': 29,
+    thirtieth: 30, thirtyfirst: 31, 'thirty-first': 31
   };
   const monthsShort = ['jan','feb','mar','apr','may','jun','jul','aug','sep','sept','oct','nov','dec'];
   const monthIdxFromName = (name) => {
