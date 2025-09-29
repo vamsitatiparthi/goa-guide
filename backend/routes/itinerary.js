@@ -372,6 +372,7 @@ class ItineraryOptimizer {
   scorePOIs(pois, budgetAllocation) {
     const activityBudget = this.budget * this.partySize * budgetAllocation.activities;
     
+    const interestSet = new Set((this.preferences.interests || []));
     return pois.map(poi => {
       let score = 0;
       const estimatedCost = this.estimatePOICost(poi);
@@ -388,12 +389,18 @@ class ItineraryOptimizer {
       score += (poi.rating || 4.0) * 8;
       
       // Category preference score (increase influence of user's interests)
-      if (this.preferences.interests) {
-        const categoryMatch = this.preferences.interests.some(interest => 
-          this.matchCategory(poi.category, interest)
-        );
-        if (categoryMatch) score += 30;
+      if (interestSet.size > 0) {
+        const isMatch = Array.from(interestSet).some(interest => this.matchCategory(poi.category, interest));
+        if (isMatch) score += 45; else score -= 8;
       }
+
+      // Tiny deterministic jitter to avoid identical orders
+      try {
+        const base = poi.id || poi.name || poi.title || JSON.stringify(poi);
+        const h = crypto.createHash('md5').update(String(base)).digest('hex');
+        const jitter = parseInt(h.slice(0, 2), 16) % 5; // 0..4
+        score += jitter;
+      } catch {}
       
       return { ...poi, score, estimated_cost: estimatedCost };
     }).sort((a, b) => b.score - a.score);
@@ -489,19 +496,80 @@ class ItineraryOptimizer {
 
   generateDayWiseItinerary(pois, events, duration, weather, startDate) {
     const itinerary = [];
-    const selectedPois = pois.slice(0, Math.min(duration * 3, pois.length));
-    const poisPerDay = Math.ceil(selectedPois.length / duration);
+    // Diversify and enforce interests: build buckets by category
+    const interests = (this.preferences.interests || []);
+    const catMap = {
+      'Beaches': ['beach'],
+      'Historical sites': ['historical','religious'],
+      'Adventure sports': ['adventure','nature'],
+      'Nightlife': ['entertainment'],
+      'Nature/Wildlife': ['nature'],
+      'Shopping': ['market','shopping']
+    };
+    const buckets = new Map();
+    for (const p of pois) {
+      const key = (p.category || 'other').toLowerCase();
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(p);
+    }
+    // Sort each bucket by score descending
+    for (const arr of buckets.values()) arr.sort((a,b)=>b.score-a.score);
+
+    // Category orders: interests first then others
+    const allCats = Array.from(buckets.keys());
+    const interestCats = [];
+    for (const i of interests) {
+      for (const c of (catMap[i] || [])) if (buckets.has(c) && !interestCats.includes(c)) interestCats.push(c);
+    }
+    const otherCats = allCats.filter(c => !interestCats.includes(c));
+    const rrCats = [...interestCats, ...otherCats];
+
+    const poisPerDay = 3; // target 3 per day
     const baseDate = startDate && !isNaN(new Date(startDate)) ? new Date(startDate) : new Date();
-    
+
+    let lastDominantCat = null;
     for (let day = 1; day <= duration; day++) {
-      const dayStart = (day - 1) * poisPerDay;
-      const dayEnd = Math.min(day * poisPerDay, selectedPois.length);
-      const dayPois = selectedPois.slice(dayStart, dayEnd);
+      const dayPois = [];
+      const catCounts = {};
+      const capPerCat = 2; // max 2 from same category per day
+
+      // 1) Ensure at least one from top-interest categories if available
+      let ensured = false;
+      for (const ic of interestCats) {
+        const arr = buckets.get(ic) || [];
+        if (arr.length > 0) {
+          dayPois.push(arr.shift());
+          catCounts[ic] = (catCounts[ic] || 0) + 1;
+          ensured = true;
+          break;
+        }
+      }
+
+      // 2) Fill remaining via round-robin, rotated by day to vary order
+      const rotated = rrCats.slice(((day-1) % Math.max(1, rrCats.length))).concat(rrCats.slice(0, ((day-1) % Math.max(1, rrCats.length))));
+      for (const c of rotated) {
+        if (dayPois.length >= poisPerDay) break;
+        const arr = buckets.get(c) || [];
+        if (arr.length === 0) continue;
+        // Cap per-day repeats and avoid repeating last day's dominant category more than once
+        const current = (catCounts[c] || 0);
+        if (current >= capPerCat) continue;
+        if (lastDominantCat && c === lastDominantCat && current >= 1) continue;
+        dayPois.push(arr.shift());
+        catCounts[c] = (catCounts[c] || 0) + 1;
+        if (dayPois.length >= poisPerDay) break;
+      }
+
+      // Determine dominant category for this day for next-day avoidance
+      let maxCount = -1, domCat = null;
+      for (const [k,v] of Object.entries(catCounts)) { if (v > maxCount) { maxCount = v; domCat = k; } }
+      lastDominantCat = domCat;
       
       // Add relevant events for this day
       const dayEvents = events.filter(event => {
         const eventDate = new Date(event.start_date);
-        return eventDate.getDate() === (new Date().getDate() + day - 1);
+        const dayDate = new Date(baseDate.getTime() + (day - 1) * 24 * 60 * 60 * 1000);
+        return eventDate.toDateString() === dayDate.toDateString();
       });
       
       // Build activities then compute transport cost between them
@@ -874,11 +942,48 @@ router.get('/:tripId', authenticateUser, [
   query('include_alternatives').optional().isBoolean()
 ], handleGetItinerary);
 
-// GET /api/v1/trips/:tripId/itinerary - alias mount point (frontend calls this)
+// GET /api/v1/trips/:tripId/itinerary - when mounted at '/api/v1/trips'
 router.get('/:tripId/itinerary', authenticateUser, [
-  param('tripId').isUUID(),
-  query('include_alternatives').optional().isBoolean()
+  param('tripId').isUUID().withMessage('Invalid trip ID'),
+  query('include_alternatives').optional().isBoolean().toBoolean()
 ], handleGetItinerary);
+
+// Re-optimize: allow tweaking budget and/or interests, then frontend refetches itinerary
+router.post('/:tripId/optimize', authenticateUser, [
+  param('tripId').isUUID().withMessage('Invalid trip ID')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { tripId } = req.params;
+    const { budget_adjustment, interests } = req.body || {};
+
+    // Load trip
+    const tr = await pool.query('SELECT * FROM trips WHERE id = $1 AND user_id = $2', [tripId, req.userId]);
+    if (tr.rows.length === 0) return res.status(404).json({ error: 'Trip not found' });
+
+    const trip = tr.rows[0];
+    let newBudget = trip.budget_per_person;
+    if (typeof budget_adjustment === 'number' && isFinite(budget_adjustment)) {
+      newBudget = Math.max(500, Math.round((trip.budget_per_person || 5000) + budget_adjustment));
+      await pool.query('UPDATE trips SET budget_per_person = $1 WHERE id = $2 AND user_id = $3', [newBudget, tripId, req.userId]);
+    }
+
+    // Merge interests into questionnaire_responses
+    if (Array.isArray(interests)) {
+      const responses = trip.questionnaire_responses || {};
+      responses.interests = interests;
+      await pool.query('UPDATE trips SET questionnaire_responses = $1 WHERE id = $2 AND user_id = $3', [responses, tripId, req.userId]);
+    }
+
+    // Nothing else to do here; client will call GET /itinerary to recompute and fetch
+    return res.json({ ok: true, budget_per_person: newBudget });
+  } catch (e) {
+    console.error('Re-optimize error:', e);
+    return res.status(500).json({ error: 'Failed to apply optimization parameters' });
+  }
+});
 
 // POST /api/v1/trips/:tripId/itinerary/optimize - Re-optimize with new constraints
 router.post('/:tripId/optimize', authenticateUser, [

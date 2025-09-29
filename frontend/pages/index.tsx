@@ -165,11 +165,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-amber-50 to-orange-100">
       <Toaster position="top-right" />
       
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white/80 backdrop-blur shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -191,12 +191,11 @@ export default function Home() {
             className="text-center"
           >
             <div className="mb-8">
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                Plan Your Perfect Goa Trip
+              <h2 className="text-4xl font-extrabold text-gray-900 mb-3">
+                Sun, Sand, and Smarter Plans ☀️🌊
               </h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                Just tell us what you want to do in Goa, and we'll create a personalized, 
-                budget-optimized itinerary for you!
+              <p className="text-lg text-gray-700 max-w-2xl mx-auto">
+                Tell us your vibe and budget — we’ll craft a Goa itinerary with beach-friendly pacing, hidden gems, and live tips.
               </p>
             </div>
 
@@ -205,14 +204,14 @@ export default function Home() {
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="e.g., I want to go to Goa for 3 days with my family. We love beaches, local food, and some adventure activities. Our budget is around ₹8000 per person."
-                  className="w-full p-6 text-lg border-2 border-gray-200 rounded-2xl focus:border-orange-500 focus:ring-0 resize-none h-32"
+                  placeholder="e.g., 3 days in Goa next month, ₹7000 pp, beaches + nightlife, 2 people"
+                  className="w-full p-6 text-lg border-2 border-amber-200 rounded-2xl focus:border-orange-500 focus:ring-0 resize-none h-32 shadow-sm"
                   disabled={loading}
                 />
                 <button
                   type="submit"
                   disabled={loading || !inputText.trim()}
-                  className="absolute bottom-4 right-4 bg-orange-500 text-white p-3 rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="absolute bottom-4 right-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white p-3 rounded-xl hover:from-orange-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow"
                 >
                   {loading ? (
                     <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
@@ -554,29 +553,6 @@ function ItineraryStep({ itinerary }: any) {
             ))}
           </div>
         </div>
-      )}
-
-      <div className="grid gap-6">
-        {localItinerary.itinerary?.map((day: any, index: number) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">
-                Day {day.day} - {new Date(day.date).toLocaleDateString()}
-              </h3>
-              <div className="text-right">
-                <div className="text-right">
-                  <div className="text-lg font-semibold text-orange-600">
-                    ₹{day.estimated_cost?.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-500">includes transport ₹{(day.transport_cost || 0).toLocaleString?.() ?? '0'}</div>
-                </div>
-              </div>
-            </div>
-
-            {day.weather_recommendation && (
-              <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                <p className="text-blue-800">🌤️ {day.weather_recommendation}</p>
-              </div>
             )}
 
             <div className="space-y-4">
