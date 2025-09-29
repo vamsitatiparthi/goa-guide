@@ -14,6 +14,8 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState('input'); // input, questions, itinerary
   const [draft, setDraft] = useState<any>(null); // parsed fields waiting user confirmation
 
+  const [chatOpen, setChatOpen] = useState(false);
+
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -321,6 +323,25 @@ export default function Home() {
           <ItineraryStep itinerary={trip.itinerary} />
         )}
       </main>
+
+      {/* Floating Chat Button */}
+      <button
+        onClick={() => setChatOpen(true)}
+        className="fixed bottom-6 right-6 z-40 rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg px-4 py-3 font-semibold hover:from-orange-600 hover:to-pink-600"
+      >
+        Ask GoaGuide AI
+      </button>
+
+      {chatOpen && (
+        <ChatCoach
+          onClose={() => setChatOpen(false)}
+          onApplyParsed={(parsed:any)=>{
+            setDraft((prev:any)=>({ ...(prev||{}), ...parsed, input_text: inputText || (prev?.input_text||'') }));
+            setCurrentStep('input');
+            toast.success('Parsed details added. Review and confirm.');
+          }}
+        />
+      )}
     </div>
   );
 }
