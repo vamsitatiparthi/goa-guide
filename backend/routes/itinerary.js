@@ -255,6 +255,53 @@ class ItineraryOptimizer {
 
     const stay_suggestions = this.getStaySuggestions(this.preferences, this.tripType);
 
+    // Build split-stay segments for practical hubs (North/South) when duration >= 5
+    const buildStaySegments = () => {
+      const segments = [];
+      const baseDate = startDate && !isNaN(new Date(startDate)) ? new Date(startDate) : new Date();
+      const likesNight = (this.preferences?.interests || []).some(i=>/nightlife/i.test(i));
+      const likesRelax = (this.preferences?.interests || []).some(i=>/nature|relax|culture|histor/i.test(i));
+      if (duration >= 5) {
+        const n1 = Math.min(2, duration-1);
+        const n2 = duration - n1;
+        const segs = [
+          { region: 'North Goa', area: likesNight ? 'Calangute / Candolim' : 'Candolim', nights: n1, rationale: 'Close to beaches, shacks, nightlife and water sports.' },
+          { region: 'South Goa', area: likesRelax ? 'Colva / Benaulim' : 'Colva', nights: n2, rationale: 'Quieter, scenic stretches ideal for relaxation and culture.' }
+        ];
+        let cursor = new Date(baseDate);
+        segs.forEach(seg=>{
+          const checkin = new Date(cursor);
+          const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate()+seg.nights);
+          const iso = (d)=> new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
+          const adults = this.partySize;
+          const nightly = this.budget || 0;
+          const google = `https://www.google.com/travel/hotels/${encodeURIComponent(seg.area + ', Goa')}?checkin=${iso(checkin)}&checkout=${iso(checkout)}&adults=${adults}&hl=en-IN&gl=IN&q=${encodeURIComponent('hotels under ₹'+nightly+' per night')}`;
+          // Booking.com price level via pri=1..5
+          let pri = 3; if (nightly<=1500) pri=1; else if (nightly<=3000) pri=2; else if (nightly<=6000) pri=3; else if (nightly<=9000) pri=4; else pri=5;
+          const booking = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(seg.area+', Goa')}&checkin=${iso(checkin)}&checkout=${iso(checkout)}&group_adults=${adults}&no_rooms=1&group_children=0&selected_currency=INR&nflt=${encodeURIComponent('pri='+pri)}`;
+          const mmt = `https://www.makemytrip.com/hotels/hotel-listing/?checkin=${iso(checkin)}&checkout=${iso(checkout)}&city=Goa&locusId=CTGOI&locusType=city&roomStayQualifier=${adults}e0e&filters=${encodeURIComponent('PRICE_RANGE:between-0-'+Math.max(0,nightly))}`;
+          const airbnb = `https://www.airbnb.co.in/s/Goa--India/homes?checkin=${iso(checkin)}&checkout=${iso(checkout)}&adults=${adults}${nightly?`&price_max=${nightly}`:''}`;
+          segments.push({ ...seg, checkin: iso(checkin), checkout: iso(checkout), deeplinks: { google_hotels: google, booking, mmt, airbnb } });
+          cursor = checkout;
+        });
+        return segments;
+      }
+      // Shorter trips: single hub based on interests
+      const area = likesNight ? 'Candolim / Baga' : (likesRelax ? 'Colva' : 'Candolim');
+      const checkin = new Date(baseDate);
+      const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate()+duration);
+      const iso = (d)=> new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
+      const adults = this.partySize; const nightly = this.budget || 0;
+      const google = `https://www.google.com/travel/hotels/${encodeURIComponent(area + ', Goa')}?checkin=${iso(checkin)}&checkout=${iso(checkout)}&adults=${adults}&hl=en-IN&gl=IN&q=${encodeURIComponent('hotels under ₹'+nightly+' per night')}`;
+      let pri = 3; if (nightly<=1500) pri=1; else if (nightly<=3000) pri=2; else if (nightly<=6000) pri=3; else if (nightly<=9000) pri=4; else pri=5;
+      const booking = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(area+', Goa')}&checkin=${iso(checkin)}&checkout=${iso(checkout)}&group_adults=${adults}&no_rooms=1&group_children=0&selected_currency=INR&nflt=${encodeURIComponent('pri='+pri)}`;
+      const mmt = `https://www.makemytrip.com/hotels/hotel-listing/?checkin=${iso(checkin)}&checkout=${iso(checkout)}&city=Goa&locusId=CTGOI&locusType=city&roomStayQualifier=${adults}e0e&filters=${encodeURIComponent('PRICE_RANGE:between-0-'+Math.max(0,nightly))}`;
+      const airbnb = `https://www.airbnb.co.in/s/Goa--India/homes?checkin=${iso(checkin)}&checkout=${iso(checkout)}&adults=${adults}${nightly?`&price_max=${nightly}`:''}`;
+      return [{ region: 'Goa', area, nights: duration, rationale: 'Convenient base near most planned activities.', checkin: iso(checkin), checkout: iso(checkout), deeplinks: { google_hotels: google, booking, mmt, airbnb } }];
+    };
+
+    const stays = buildStaySegments();
+
     // Optionally enrich each day with a short AI tip using FREE_AI_* if available
     try {
       for (const day of itinerary) {
@@ -277,8 +324,30 @@ class ItineraryOptimizer {
       }
     } catch {}
 
+    // Build totals and enrich days with transport/tips/costs
+    let grandGroup = 0;
+    const enriched = itinerary.map(d => {
+      const perPerson = Math.round(d.estimated_cost / Math.max(1,this.partySize));
+      const items = [
+        { label: 'Activities', per_person: Math.round((d.estimated_cost - d.transport_cost)/Math.max(1,this.partySize)), group: d.estimated_cost - d.transport_cost },
+        { label: 'Transport', per_person: Math.round(d.transport_cost/Math.max(1,this.partySize)), group: d.transport_cost },
+      ];
+      const transport = { local: 'Scooters for short hops; taxis for airport/long hops. Expect 20–30 km/h in day traffic.', between: [] };
+      // Add between segments from activity travel annotations
+      try {
+        for (let i=1;i<d.activities.length;i++){
+          const a=d.activities[i-1], b=d.activities[i];
+          if (b.travel_time_min && b.travel_dist_km) transport.between.push({ from: a.activity?.name||a.activity?.title, to: b.activity?.name||b.activity?.title, mode: b.travel_dist_km>8? 'taxi' : 'scooter', time_min: b.travel_time_min, est_cost: Math.round((b.travel_dist_km||0)*20) });
+        }
+      } catch {}
+      const costs = { per_person: perPerson, group_total: d.estimated_cost, items };
+      grandGroup += d.estimated_cost;
+      return { ...d, transport, costs };
+    });
+    const totals = { per_person: Math.round(grandGroup/Math.max(1,this.partySize)), group: grandGroup };
+
     return {
-      itinerary,
+      itinerary: enriched,
       budget_status: budgetStatus,
       total_cost: totalCost,
       budget_limit: totalBudget,
@@ -293,7 +362,9 @@ class ItineraryOptimizer {
         wind_speed: weather.wind_speed,
       },
       optimization_score: this.calculateOptimizationScore(itinerary, totalCost, totalBudget),
-      stay_suggestions
+      stay_suggestions,
+      stays,
+      totals
     };
   }
 
