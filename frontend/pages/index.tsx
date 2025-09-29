@@ -569,9 +569,29 @@ function ItineraryStep({ itinerary }: any) {
             ))}
           </div>
         </div>
+      )}
+
+      <div className="space-y-6">
+        {localItinerary.itinerary?.map((day: any, index: number) => (
+          <div key={index} className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xl font-semibold text-gray-900">Day {day.day} • {new Date(day.date).toLocaleDateString()}</h4>
+                <div className="text-sm text-gray-500">{day.weather_recommendation}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-semibold text-orange-600">₹{day.estimated_cost?.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">includes transport ₹{(day.transport_cost || 0).toLocaleString?.() ?? '0'}</div>
+              </div>
+            </div>
+
+            {day.ai_tip && (
+              <div className="mt-3 text-sm text-teal-700 bg-teal-50 border border-teal-200 rounded-lg p-3">
+                💡 {day.ai_tip}
+              </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-4 mt-3">
               {day.activities?.map((activity: any, idx: number) => (
                 <div key={idx} className="flex items-start justify-between py-3 border-b last:border-0">
                   <div className="flex-1">
