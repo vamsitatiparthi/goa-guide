@@ -15,9 +15,41 @@ export default function Home() {
   const [draft, setDraft] = useState<any>(null); // parsed fields waiting user confirmation
 
   const [chatOpen, setChatOpen] = useState(false);
-  // Inline helpers to capture People and Interests clearly up front
-  const [partySizeInput, setPartySizeInput] = useState<string>('');
-  const [interestsInput, setInterestsInput] = useState<string>('');
+
+  // Util: normalize various date strings to ISO YYYY-MM-DD and fix past year -> current year
+  const normalizeISODate = (val?: string | null) => {
+    if (!val || typeof val !== 'string') return val;
+    let s = val.trim();
+    // Convert dd-mm-yyyy to yyyy-mm-dd
+    const dmy = s.match(/^(\d{2})[-\/.](\d{2})[-\/.](\d{4})$/);
+    if (dmy) {
+      s = `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    }
+    // Already ISO?
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      const year = parseInt(iso[1], 10);
+      const month = parseInt(iso[2], 10) - 1;
+      const day = parseInt(iso[3], 10);
+      const nowY = new Date().getFullYear();
+      const dt = new Date(year, month, day);
+      if (year < nowY) {
+        const fixed = new Date(nowY, month, day);
+        return fixed.toISOString().split('T')[0];
+      }
+      return dt.toISOString().split('T')[0];
+    }
+    // Try parsing natural date
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const nowY = new Date().getFullYear();
+      let y = dt.getFullYear();
+      if (y < nowY) y = nowY;
+      const fixed = new Date(y, dt.getMonth(), dt.getDate());
+      return fixed.toISOString().split('T')[0];
+    }
+    return s;
+  };
 
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,9 +62,9 @@ export default function Home() {
         headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
       });
       const parsed = parseRes.data?.parsed || {};
-      // Merge inline helpers so the model doesn't miss them
-      if (partySizeInput) parsed.party_size = parseInt(partySizeInput, 10);
-      if (interestsInput) parsed.interests = interestsInput.split(',').map(s=>s.trim()).filter(Boolean);
+      // Normalize dates immediately to ISO and current year
+      if (parsed.start_date) parsed.start_date = normalizeISODate(parsed.start_date);
+      if (parsed.end_date) parsed.end_date = normalizeISODate(parsed.end_date);
 
       // If basic essentials are missing, ask user to confirm them first
       const needsDates = !(parsed.start_date && parsed.end_date) && !parsed.duration_days;
@@ -232,31 +264,6 @@ export default function Home() {
                   )}
                 </button>
               </div>
-              {/* Inline helpers for clarity */}
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">People</label>
-                  <input
-                    type="number"
-                    min={1}
-                    inputMode="numeric"
-                    value={partySizeInput}
-                    onChange={(e)=>setPartySizeInput(e.target.value)}
-                    placeholder="e.g., 2"
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-xs text-gray-600 mb-1">Interests (comma separated)</label>
-                  <input
-                    type="text"
-                    value={interestsInput}
-                    onChange={(e)=>setInterestsInput(e.target.value)}
-                    placeholder="e.g., Beaches, Nightlife, Local cuisine"
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-              </div>
             </form>
 
             {draft && (
@@ -305,15 +312,25 @@ export default function Home() {
                       className="w-full p-2 border rounded-lg" />
                   </div>
                   <div>
-                    <label className="text-sm text-gray-600">OR Duration (days)</label>
-                    <input type="number" min={1} max={14} value={draft.duration_days}
-                      onChange={(e)=>setDraft({ ...draft, duration_days: parseInt(e.target.value||'0',10) })}
-                      className="w-full p-2 border rounded-lg" />
-                  </div>
-                  <div>
                     <label className="text-sm text-gray-600">Budget per person (₹)</label>
                     <input type="number" min={1000} step={100} value={draft.budget_per_person}
                       onChange={(e)=>setDraft({ ...draft, budget_per_person: parseInt(e.target.value||'0',10) })}
+                      className="w-full p-2 border rounded-lg" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">People</label>
+                    <input type="number" min={1} value={draft.party_size || ''}
+                      onChange={(e)=>setDraft({ ...draft, party_size: parseInt(e.target.value||'0',10) })}
+                      className="w-full p-2 border rounded-lg" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm text-gray-600">Interests (comma separated)</label>
+                    <input type="text" value={(Array.isArray(draft.interests)? draft.interests.join(', ') : draft.interests || '')}
+                      onChange={(e)=>{
+                        const arr = e.target.value.split(',').map(s=>s.trim()).filter(Boolean);
+                        setDraft({ ...draft, interests: arr });
+                      }}
+                      placeholder="e.g., Beaches, Nightlife, Local cuisine"
                       className="w-full p-2 border rounded-lg" />
                   </div>
                 </div>
@@ -337,7 +354,16 @@ export default function Home() {
                 })()}
                 <div className="mt-4 flex justify-end gap-3">
                   <button onClick={()=>setDraft(null)} className="px-4 py-2 rounded-lg border">Cancel</button>
-                  <button onClick={handleConfirmBasics} disabled={loading} className="px-4 py-2 rounded-lg bg-orange-500 text-white">Continue</button>
+                  <button onClick={async ()=>{
+                    // Normalize draft dates before submit
+                    const norm = {
+                      ...draft,
+                      start_date: normalizeISODate(draft.start_date),
+                      end_date: normalizeISODate(draft.end_date),
+                    };
+                    setDraft(norm);
+                    await handleConfirmBasics();
+                  }} disabled={loading} className="px-4 py-2 rounded-lg bg-orange-500 text-white">Continue</button>
                 </div>
               </div>
             )}
@@ -387,7 +413,12 @@ export default function Home() {
         <ChatCoach
           onClose={() => setChatOpen(false)}
           onApplyParsed={(parsed:any)=>{
-            setDraft((prev:any)=>({ ...(prev||{}), ...parsed, input_text: inputText || (prev?.input_text||'') }));
+            const normalizedParsed = {
+              ...parsed,
+              start_date: normalizeISODate(parsed.start_date),
+              end_date: normalizeISODate(parsed.end_date),
+            };
+            setDraft((prev:any)=>({ ...(prev||{}), ...normalizedParsed, input_text: inputText || (prev?.input_text||'') }));
             setCurrentStep('input');
             toast.success('Parsed details added. Review and confirm.');
           }}
@@ -715,7 +746,23 @@ function ItineraryStep({ itinerary }: any) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {localItinerary.stay_suggestions.map((s: any, idx: number) => {
               const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(s.area + ', Goa')}`;
-              const hotelsUrl = `https://www.google.com/travel/hotels/${encodeURIComponent(s.area + ', Goa')}`;
+              // Build Google Hotels URL with criteria from itinerary preferences and dates
+              const days = Array.isArray(localItinerary.itinerary) ? localItinerary.itinerary : [];
+              const checkin = days.length ? new Date(days[0].date) : null;
+              const last = days.length ? new Date(days[days.length - 1].date) : null;
+              const checkout = last ? new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1) : null;
+              const iso = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0] : '';
+              const adults = localItinerary.preferences?.party_size || localItinerary.party_size || 2;
+              const nightlyBudget = localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || '';
+              const params = new URLSearchParams();
+              if (checkin) params.set('checkin', iso(checkin));
+              if (checkout) params.set('checkout', iso(checkout));
+              if (adults) params.set('adults', String(adults));
+              params.set('hl','en-IN');
+              params.set('gl','IN');
+              const q = `hotels near ${s.area}, Goa ${nightlyBudget ? `under ₹${nightlyBudget} per night` : ''}`.trim();
+              params.set('q', q);
+              const hotelsUrl = `https://www.google.com/travel/hotels/${encodeURIComponent(s.area + ', Goa')}?${params.toString()}`;
               return (
                 <div key={idx} className="border rounded-lg p-4 bg-orange-50 border-orange-200">
                   <div className="font-semibold text-orange-800">{s.area}</div>
@@ -808,18 +855,45 @@ function ItineraryStep({ itinerary }: any) {
               ))}
             </div>
 
-            {Array.isArray(day.hotel_suggestions) && day.hotel_suggestions.length > 0 && (
-              <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                <div className="text-sm font-semibold text-orange-800 mb-2">Stay nearby</div>
-                <div className="flex flex-wrap gap-2">
-                  {day.hotel_suggestions.map((h: any, i: number) => (
-                    <a key={i} href={h.url} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-orange-700 border border-orange-300 hover:bg-orange-100">
-                      {h.label}
-                    </a>
-                  ))}
-                </div>
+            {/* Stay nearby / Find Hotels button with smart criteria */}
+            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="text-sm font-semibold text-orange-800 mb-2">Stay nearby</div>
+              <div className="flex flex-wrap gap-2">
+                {Array.isArray(day.hotel_suggestions) && day.hotel_suggestions.length > 0 && day.hotel_suggestions.map((h: any, i: number) => (
+                  <a key={i} href={h.url} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-orange-700 border border-orange-300 hover:bg-orange-100">
+                    {h.label}
+                  </a>
+                ))}
+                {(() => {
+                  // Fallback/companion dynamic link using day date and first activity location
+                  try {
+                    const firstAct = (day.activities && day.activities[0]?.activity) || {};
+                    const near = firstAct.area || firstAct.neighborhood || firstAct.name || 'Goa';
+                    const checkin = new Date(day.date);
+                    const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate() + 1);
+                    const iso = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
+                    const adults = localItinerary.preferences?.party_size || localItinerary.party_size || 2;
+                    const nightlyBudget = localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || '';
+                    const params = new URLSearchParams();
+                    params.set('checkin', iso(checkin));
+                    params.set('checkout', iso(checkout));
+                    params.set('adults', String(adults));
+                    params.set('hl','en-IN');
+                    params.set('gl','IN');
+                    const q = `hotels near ${near}, Goa ${nightlyBudget ? `under ₹${nightlyBudget} per night` : ''}`.trim();
+                    params.set('q', q);
+                    const href = `https://www.google.com/travel/hotels/${encodeURIComponent(near + ', Goa')}?${params.toString()}`;
+                    return (
+                      <a href={href} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-pink-700 border border-pink-300 hover:bg-pink-100">
+                        Find Hotels in Goa
+                      </a>
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
               </div>
-            )}
+            </div>
           </div>
         ))}
       </div>
