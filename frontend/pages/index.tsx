@@ -293,12 +293,14 @@ export default function Home() {
                   <div>
                     <label className="text-sm text-gray-600">Start date</label>
                     <input type="date" value={draft.start_date}
+                      min={new Date().toISOString().split('T')[0]}
                       onChange={(e)=>setDraft({ ...draft, start_date: e.target.value })}
                       className="w-full p-2 border rounded-lg" />
                   </div>
                   <div>
                     <label className="text-sm text-gray-600">End date</label>
                     <input type="date" value={draft.end_date}
+                      min={new Date().toISOString().split('T')[0]}
                       onChange={(e)=>setDraft({ ...draft, end_date: e.target.value })}
                       className="w-full p-2 border rounded-lg" />
                   </div>
@@ -315,6 +317,24 @@ export default function Home() {
                       className="w-full p-2 border rounded-lg" />
                   </div>
                 </div>
+                {/* Past date warning */}
+                {(() => {
+                  try {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const s = draft.start_date ? new Date(draft.start_date) : null;
+                    const e = draft.end_date ? new Date(draft.end_date) : null;
+                    const isPast = (s && s < today) || (e && e < today);
+                    if (isPast) {
+                      return (
+                        <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
+                          The selected dates are in the past. Please pick future dates to get accurate hotels, events, and activities.
+                        </div>
+                      );
+                    }
+                  } catch {}
+                  return null;
+                })()}
                 <div className="mt-4 flex justify-end gap-3">
                   <button onClick={()=>setDraft(null)} className="px-4 py-2 rounded-lg border">Cancel</button>
                   <button onClick={handleConfirmBasics} disabled={loading} className="px-4 py-2 rounded-lg bg-orange-500 text-white">Continue</button>
