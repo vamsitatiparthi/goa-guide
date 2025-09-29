@@ -37,6 +37,42 @@ class ItineraryOptimizer {
     };
   }
 
+  // Optional: short tip per day using LLM (OpenAI-compatible)
+  async refineDayTipWithLLM(dayContext) {
+    try {
+      const apiKey = process.env.FREE_AI_API_KEY;
+      const apiUrl = process.env.FREE_AI_API_URL;
+      const model = process.env.FREE_AI_MODEL || 'gpt-3.5-turbo';
+      if (!apiKey || !apiUrl) return null;
+
+      const keyStr = JSON.stringify(dayContext);
+      const cacheKey = 'day_tip_' + crypto.createHash('sha1').update(keyStr).digest('hex');
+      const cached = cache.get(cacheKey);
+      if (cached) return cached;
+
+      const body = {
+        model,
+        messages: [
+          { role: 'system', content: 'You are GoaGuide AI. Return one short local tip for the day (max 20 words). Example: “Carry cash for Anjuna flea market; sunsets best 6:15–6:40pm at Vagator.” Output plain text only.' },
+          { role: 'user', content: `Day context: ${keyStr}` }
+        ],
+        temperature: 0.6,
+        max_tokens: 60
+      };
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+      const resp = await axios.post(`${apiUrl.replace(/\/$/, '')}/chat/completions`, body, { headers, timeout: 10000 });
+      const text = resp.data?.choices?.[0]?.message?.content?.trim();
+      if (text) {
+        const tip = text.replace(/^"|"$/g, '');
+        cache.set(cacheKey, tip, 3600);
+        return tip;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async refineNarrativeWithLLM(narrative, context) {
     try {
       const apiKey = process.env.FREE_AI_API_KEY;
@@ -218,6 +254,28 @@ class ItineraryOptimizer {
       this.generateBudgetAlternatives(itinerary, totalBudget) : [];
 
     const stay_suggestions = this.getStaySuggestions(this.preferences, this.tripType);
+
+    // Optionally enrich each day with a short AI tip using FREE_AI_* if available
+    try {
+      for (const day of itinerary) {
+        const acts = (day.activities || []).map(a => ({
+          time: a.time,
+          name: a.activity?.name || a.activity?.title,
+          category: a.activity?.category,
+          notes: a.notes,
+        }));
+        const ctx = {
+          date: day.date,
+          weather: day.weather_recommendation,
+          budget_per_person: this.budget,
+          trip_type: this.tripType,
+          interests: this.preferences?.interests || [],
+          activities: acts
+        };
+        const tip = await this.refineDayTipWithLLM(ctx);
+        if (tip) day.ai_tip = tip;
+      }
+    } catch {}
 
     return {
       itinerary,
@@ -452,6 +510,25 @@ class ItineraryOptimizer {
       const dayTransportKm = activities.reduce((sum, a) => sum + (a.travel_dist_km || 0), 0);
       const transportCost = Math.round(dayTransportKm * transportRatePerKm);
 
+      // Build hotel deeplinks near first activity
+      const firstAct = activities.find(a => a.activity && (a.activity.lat || a.activity.location_lat)) || {};
+      const lat = firstAct.activity?.lat ?? firstAct.activity?.location_lat;
+      const lon = firstAct.activity?.lon ?? firstAct.activity?.location_lon;
+      const nightlyBudgetPerPerson = Math.round((this.budget || 5000) / Math.max(1, duration));
+      const nightlyBudgetText = `under ₹${nightlyBudgetPerPerson.toLocaleString('en-IN')}`;
+      let hotel_links = [];
+      if (lat != null && lon != null) {
+        const hotelsUrl = `https://www.google.com/travel/hotels/Goa?q=hotels%20near%20${encodeURIComponent(lat + ',' + lon)}%20${encodeURIComponent(nightlyBudgetText)}`;
+        const mapsHotels = `https://www.google.com/maps/search/${encodeURIComponent('Hotels near ' + lat + ',' + lon + ' ' + nightlyBudgetText)}`;
+        hotel_links = [
+          { label: 'Find Hotels Nearby', url: hotelsUrl },
+          { label: 'Maps: Hotels Nearby', url: mapsHotels }
+        ];
+      } else {
+        const hotelsUrlCity = `https://www.google.com/travel/hotels/Goa?q=${encodeURIComponent('budget ' + nightlyBudgetText)}`;
+        hotel_links = [{ label: 'Find Hotels in Goa', url: hotelsUrlCity }];
+      }
+
       const dailyBudget = Math.round((this.budget * this.partySize) / Math.max(1, duration));
 
       const dayItinerary = {
@@ -462,7 +539,8 @@ class ItineraryOptimizer {
                        dayEvents.reduce((sum, event) => sum + event.estimated_cost, 0) +
                        transportCost,
         transport_cost: transportCost,
-        weather_recommendation: this.getDayWeatherRecommendation(weather, day)
+        weather_recommendation: this.getDayWeatherRecommendation(weather, day),
+        hotel_suggestions: hotel_links
       };
 
       // Keep recommendations within per-day budget by trimming lowest-priority late activities

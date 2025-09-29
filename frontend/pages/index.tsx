@@ -511,12 +511,7 @@ function ItineraryStep({ itinerary }: any) {
         </div>
       </div>
 
-      {localItinerary.narrative && (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">GoaGuide Summary</h3>
-          <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed">{localItinerary.narrative}</pre>
-        </div>
-      )}
+      {/* Narrative summary removed per request */}
 
       {localItinerary.stay_suggestions && localItinerary.stay_suggestions.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -619,6 +614,19 @@ function ItineraryStep({ itinerary }: any) {
                 </div>
               ))}
             </div>
+
+            {Array.isArray(day.hotel_suggestions) && day.hotel_suggestions.length > 0 && (
+              <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="text-sm font-semibold text-orange-800 mb-2">Stay nearby</div>
+                <div className="flex flex-wrap gap-2">
+                  {day.hotel_suggestions.map((h: any, i: number) => (
+                    <a key={i} href={h.url} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-orange-700 border border-orange-300 hover:bg-orange-100">
+                      {h.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
