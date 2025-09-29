@@ -218,10 +218,23 @@ class ItineraryOptimizer {
   estimateTravelMinutes(from, to, baseDateStr, timeStr) {
     // from/to: objects with latitude, longitude
     if (!from || !to || from.latitude == null || to.latitude == null) return null;
+    const useOSRM = (process.env.USE_OSRM || 'true') !== 'false';
+    if (useOSRM) {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?overview=false`;
+        return axios.get(url, { timeout: 3000 }).then(resp => {
+          const r = resp.data?.routes?.[0];
+          if (r) {
+            const minutes = Math.max(5, Math.round((r.duration || 0) / 60));
+            const distKm = Math.round(((r.distance || 0) / 1000) * 10) / 10;
+            return { minutes, distKm, speed: null };
+          }
+          return null;
+        }).catch(()=>null);
+      } catch {}
+    }
     const distKm = this.haversineKm(from.latitude, from.longitude, to.latitude, to.longitude);
-    // Parse hour from timeStr 'HH:MM'
-    let hour = 9;
-    try { hour = parseInt((timeStr || '09:00').split(':')[0], 10); } catch {}
+    let hour = 9; try { hour = parseInt((timeStr || '09:00').split(':')[0], 10); } catch {}
     const speed = this.trafficSpeedKmph(hour);
     const minutes = Math.max(5, Math.round((distKm / speed) * 60));
     return { minutes, distKm: Math.round(distKm * 10) / 10, speed };
@@ -387,13 +400,12 @@ class ItineraryOptimizer {
       const cityKey = (city || 'Goa').toLowerCase();
       const cacheKey = `weather_${cityKey}`;
       let weather = cache.get(cacheKey);
-      
+
       const apiKey = process.env.OPENWEATHER_API_KEY || process.env.WEATHER_API_KEY;
       if (!weather && apiKey) {
         const response = await axios.get(
           `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`
         );
-        
         weather = {
           temperature: response.data.main.temp,
           condition: response.data.weather[0].main,
@@ -401,16 +413,31 @@ class ItineraryOptimizer {
           humidity: response.data.main.humidity,
           wind_speed: response.data.wind.speed
         };
-        
         cache.set(cacheKey, weather);
       }
-      
-      // Determine weather impact on activities
+
+      // Fallback to Open-Meteo if OpenWeather not configured or failed
+      if (!weather) {
+        // Goa approx coordinates
+        const lat = 15.4968, lon = 73.8278;
+        const resp = await axios.get(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m`);
+        const current = resp.data?.current || {};
+        const code = current.weather_code;
+        const codeMap = { 0: 'Clear', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Depositing rime fog', 51: 'Drizzle', 61: 'Rain', 71: 'Snow', 80: 'Rain showers' };
+        weather = {
+          temperature: current.temperature_2m ?? 28,
+          condition: codeMap[code] || 'Clear',
+          description: codeMap[code] || 'clear',
+          humidity: 70,
+          wind_speed: current.wind_speed_10m ?? 10
+        };
+        cache.set(cacheKey, weather);
+      }
+
       const impact = this.assessWeatherImpact(weather);
-      
       return { ...weather, impact };
     } catch (error) {
-      console.error('Weather API error:', error);
+      console.error('Weather API error:', error.message);
       return { 
         temperature: 28, 
         condition: 'Clear', 
@@ -925,16 +952,77 @@ async function handleGetItinerary(req, res) {
     
     const trip = tripResult.rows[0];
     
-    // Get POIs near Goa
-    const poisQuery = `
-      SELECT *, ST_X(location) as longitude, ST_Y(location) as latitude
-      FROM pois 
-      WHERE ST_DWithin(location, ST_GeomFromText('POINT(73.8370 15.4989)', 4326), 0.5)
-      ORDER BY rating DESC
-      LIMIT 20
-    `;
-    
-    const poisResult = await pool.query(poisQuery);
+    // Fetch POIs: prefer OpenTripMap live data; fallback to curated DB if available
+    const otmKey = process.env.OPENTRIPMAP_API_KEY;
+    let otmPois = [];
+    const interestKindsMap = {
+      beaches: 'beaches',
+      historical: 'historic,forts,castles,architecture,monuments,churches',
+      religious: 'temples,churches',
+      nature: 'natural,parks,view_points',
+      adventure: 'water_sports,sport,amusements',
+      entertainment: 'clubs,pubs,adult,nigthclubs,cinemas',
+      market: 'malls,shops,marketplaces',
+      shopping: 'malls,shops,marketplaces',
+      food: 'catering',
+    };
+    const kindsForInterests = () => {
+      const ints = (trip.questionnaire_responses?.interests || []).map(s=>s.toLowerCase());
+      const kinds = new Set();
+      for (const i of ints) {
+        if (/beach/.test(i)) kinds.add('beaches');
+        if (/historical|culture|fort|church/.test(i)) kinds.add('historic');
+        if (/nature|wildlife/.test(i)) kinds.add('natural');
+        if (/adventure/.test(i)) kinds.add('water_sports');
+        if (/night/.test(i)) kinds.add('clubs');
+        if (/shopping|market/.test(i)) kinds.add('shops');
+        if (/food|cuisine/.test(i)) kinds.add('catering');
+      }
+      if (kinds.size === 0) return 'beaches,historic,catering,shops';
+      return Array.from(kinds).join(',');
+    };
+    const otmFetch = async () => {
+      if (!otmKey) return [];
+      const cacheKey = 'otm_goa_' + (tripId || 'default') + '_' + (kindsForInterests());
+      const got = cache.get(cacheKey);
+      if (got) return got;
+      // Goa bounding box approx
+      const bbox = { lon_min: 73.6, lon_max: 74.3, lat_min: 14.9, lat_max: 15.9 };
+      const kinds = kindsForInterests();
+      const url = `https://api.opentripmap.com/0.1/en/places/bbox?lon_min=${bbox.lon_min}&lat_min=${bbox.lat_min}&lon_max=${bbox.lon_max}&lat_max=${bbox.lat_max}&kinds=${encodeURIComponent(kinds)}&rate=1&limit=80&apikey=${otmKey}`;
+      const r = await axios.get(url, { timeout: 6000 });
+      const features = r.data?.features || [];
+      const mapped = features.map(f => {
+        const p = f.properties || {};
+        const g = f.geometry || {}; const coords = g.coordinates || [];
+        const lon = coords[0]; const lat = coords[1];
+        const name = p.name || p.osm?.name || 'Place';
+        const cat = (p.kinds || '').split(',')[0] || 'other';
+        // Rough rating: OTM rate 1..7; scale to 3.5..5
+        const rating = 3.5 + ((p.rate || 1) / 7) * 1.5;
+        const price_range = /beach|market|natural/.test(cat) ? 'budget' : /historic|museum|fort/.test(cat) ? 'budget' : 'mid_range';
+        return { id: p.xid || p.osm?.id || name+lat+lon, name, title: name, latitude: lat, longitude: lon, category: cat.includes('beach')?'beach':cat.includes('historic')?'historical':cat.includes('natural')?'nature':cat.includes('clubs')?'entertainment':cat.includes('shops')?'shopping':cat.includes('catering')?'food':'other', rating, price_range };
+      });
+      cache.set(cacheKey, mapped, 600);
+      return mapped;
+    };
+
+    try { otmPois = await otmFetch(); } catch (e) { console.warn('OpenTripMap fetch failed', e.message); }
+
+    // Fallback to DB curated POIs (optional table)
+    let dbPois = [];
+    try {
+      const poisQuery = `
+        SELECT *, ST_X(location) as longitude, ST_Y(location) as latitude
+        FROM pois 
+        WHERE ST_DWithin(location, ST_GeomFromText('POINT(73.8370 15.4989)', 4326), 0.5)
+        ORDER BY rating DESC
+        LIMIT 20
+      `;
+      const poisResult = await pool.query(poisQuery);
+      dbPois = poisResult.rows || [];
+    } catch {}
+    const poisCombined = [...otmPois, ...dbPois];
     
     // Get upcoming events
     const eventsQuery = `
@@ -966,7 +1054,7 @@ async function handleGetItinerary(req, res) {
     
     // Generate optimized itinerary
     const result = await optimizer.optimizeItinerary(
-      poisResult.rows,
+      poisCombined,
       eventsResult.rows,
       duration,
       city,
