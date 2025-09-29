@@ -15,6 +15,9 @@ export default function Home() {
   const [draft, setDraft] = useState<any>(null); // parsed fields waiting user confirmation
 
   const [chatOpen, setChatOpen] = useState(false);
+  // Inline helpers to capture People and Interests clearly up front
+  const [partySizeInput, setPartySizeInput] = useState<string>('');
+  const [interestsInput, setInterestsInput] = useState<string>('');
 
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +30,9 @@ export default function Home() {
         headers: { 'x-user-id': 'demo-user-123', 'Content-Type': 'application/json' }
       });
       const parsed = parseRes.data?.parsed || {};
+      // Merge inline helpers so the model doesn't miss them
+      if (partySizeInput) parsed.party_size = parseInt(partySizeInput, 10);
+      if (interestsInput) parsed.interests = interestsInput.split(',').map(s=>s.trim()).filter(Boolean);
 
       // If basic essentials are missing, ask user to confirm them first
       const needsDates = !(parsed.start_date && parsed.end_date) && !parsed.duration_days;
@@ -210,7 +216,7 @@ export default function Home() {
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="e.g., 3 days in Goa next month, ₹7000 pp, beaches + nightlife, 2 people"
+                  placeholder="e.g., 3 days in Goa this November, ₹7000 pp, beaches + nightlife, 2 people"
                   className="w-full p-6 text-lg border-2 border-amber-200 rounded-2xl focus:border-orange-500 focus:ring-0 resize-none h-32 shadow-sm"
                   disabled={loading}
                 />
@@ -225,6 +231,31 @@ export default function Home() {
                     <PaperAirplaneIcon className="h-6 w-6" />
                   )}
                 </button>
+              </div>
+              {/* Inline helpers for clarity */}
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">People</label>
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={partySizeInput}
+                    onChange={(e)=>setPartySizeInput(e.target.value)}
+                    placeholder="e.g., 2"
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-gray-600 mb-1">Interests (comma separated)</label>
+                  <input
+                    type="text"
+                    value={interestsInput}
+                    onChange={(e)=>setInterestsInput(e.target.value)}
+                    placeholder="e.g., Beaches, Nightlife, Local cuisine"
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                </div>
               </div>
             </form>
 
@@ -340,12 +371,121 @@ export default function Home() {
             setCurrentStep('input');
             toast.success('Parsed details added. Review and confirm.');
           }}
+          parsedContext={draft}
         />
       )}
     </div>
   );
 }
 
+// AI chat widget component to collect essentials and feed into draft
+type Message = { role: 'user' | 'assistant'; content: string };
+function ChatCoach({ onClose, onApplyParsed, parsedContext }: { onClose: () => void; onApplyParsed: (parsed: any) => void; parsedContext?: any }) {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content:
+        'Hi! I can plan your Goa trip. Tell me your travel dates (or duration), budget per person, party size, and interests (e.g., Beaches, Nightlife, Historical sites).',
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [lastParsed, setLastParsed] = useState<any>(null);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    const next: Message[] = [...messages, { role: 'user' as const, content: text }];
+    setMessages(next);
+    setInput('');
+    setLoading(true);
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/chat/coach`,
+        { messages: next, context: { app: 'GoaGuide', parsed: parsedContext || null } },
+        { headers: { 'x-user-id': 'demo-user-123' } }
+      );
+      const reply = res.data?.reply || 'Okay.';
+      const parsed = res.data?.parsed || null;
+      const done = !!res.data?.done;
+      setMessages((curr) => [...curr, { role: 'assistant' as const, content: reply }]);
+      setLastParsed(parsed);
+      if (done && parsed) onApplyParsed(parsed);
+    } catch (e) {
+      setMessages((curr) => [
+        ...curr,
+        {
+          role: 'assistant' as const,
+          content:
+            'Sorry, I had trouble. Could you share your dates (or duration), budget per person, party size, and interests?',
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/20 p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b flex items-center justify-between bg-gradient-to-r from-orange-50 to-amber-50">
+          <div className="font-semibold text-gray-900">GoaGuide AI Coach</div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
+            ✕
+          </button>
+        </div>
+        <div className="p-4 space-y-3 max-h-[60vh] overflow-auto">
+          {messages.map((m, i) => (
+            <div
+              key={i}
+              className={`${
+                m.role === 'assistant'
+                  ? 'bg-orange-50 border border-orange-200 text-gray-900'
+                  : 'bg-blue-50 border border-blue-200 text-gray-900'
+              } rounded-xl px-3 py-2 text-sm`}
+            >
+              {m.content}
+            </div>
+          ))}
+          {lastParsed && (
+            <div className="text-xs text-gray-600">
+              Parsed so far:{' '}
+              {Object.entries(lastParsed)
+                .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+                .join(' · ')}
+            </div>
+          )}
+        </div>
+        <div className="p-3 border-t flex items-center gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="Type your message..."
+            className="flex-1 border rounded-lg px-3 py-2"
+          />
+          <button
+            onClick={send}
+            disabled={loading || !input.trim()}
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-500 text-white disabled:opacity-50"
+          >
+            {loading ? '...' : 'Send'}
+          </button>
+          {lastParsed && (
+            <button onClick={() => onApplyParsed(lastParsed)} className="px-3 py-2 rounded-lg border">
+              Use details
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 function FeatureCard({ icon, title, description }: any) {
   return (
     <motion.div
