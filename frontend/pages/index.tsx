@@ -165,7 +165,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-amber-50 to-orange-100">
+    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-amber-50 to-orange-100 relative overflow-x-hidden">
+      {/* Decorative beach waves background */}
+      <div className="pointer-events-none select-none fixed inset-0 -z-10 opacity-50">
+        <img src="/beach-waves.svg" alt="beach waves" className="w-full h-full object-cover" />
+      </div>
       <Toaster position="top-right" />
       
       {/* Header */}
@@ -446,13 +450,25 @@ function QuestionsStep({ trip, onSubmit, loading }: any) {
 function ItineraryStep({ itinerary }: any) {
   const [localItinerary, setLocalItinerary] = useState(itinerary);
   const router = useRouter();
+  const [budgetDelta, setBudgetDelta] = useState(0);
+  const interestOptions = [
+    'Beaches',
+    'Historical sites',
+    'Adventure sports',
+    'Nightlife',
+    'Local cuisine',
+    'Shopping',
+    'Nature/Wildlife',
+  ];
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(Array.isArray(localItinerary?.preferences?.interests) ? localItinerary.preferences.interests : []);
 
   const handleReoptimize = async () => {
     try {
       toast.loading('Re-optimizing itinerary...', { id: 'reopt' });
       // Ask backend to re-optimize with a small budget tweak as demo
       await axios.post(`${API_BASE_URL}/trips/${localItinerary.trip_id}/optimize`, {
-        budget_adjustment: 0, // keep same for now; endpoint is stubbed but ready
+        budget_adjustment: budgetDelta,
+        interests: selectedInterests,
       }, {
         headers: { 'x-user-id': 'demo-user-123' }
       });
