@@ -51,6 +51,8 @@ export default function Home() {
     return s;
   };
 
+  
+
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -674,6 +676,79 @@ function ItineraryStep({ itinerary }: any) {
   ];
   const [selectedInterests, setSelectedInterests] = useState<string[]>(Array.isArray(localItinerary?.preferences?.interests) ? localItinerary.preferences.interests : []);
 
+  // Helpers to build stay deeplinks (Google Hotels, Booking.com, MakeMyTrip)
+  const buildStayLink = (near: string, checkinDateISO: string) => {
+    try {
+      const checkin = new Date(checkinDateISO);
+      const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate() + 1);
+      const iso = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
+      const adults = (localItinerary.preferences?.party_size || localItinerary.party_size || 2) as number;
+      const nightly = (localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || 0) as number;
+      // Simple heuristic for label
+      let kind: 'hostels' | 'family' | 'hotels' = 'hotels';
+      if (adults >= 4) kind = 'family';
+      if (nightly && nightly <= 1500 && adults <= 2) kind = 'hostels';
+      const label = kind === 'hostels' ? 'Find hostels nearby' : kind === 'family' ? 'Find family-friendly stays' : 'Find hotels nearby';
+      const qBase = kind === 'hostels' ? 'hostels' : (kind === 'family' ? 'family friendly hotels' : 'hotels');
+      const params = new URLSearchParams();
+      params.set('checkin', iso(checkin));
+      params.set('checkout', iso(checkout));
+      params.set('adults', String(adults));
+      params.set('hl', 'en-IN');
+      params.set('gl', 'IN');
+      const q = `${qBase} near ${near || 'Goa'}, Goa ${nightly ? `under ₹${nightly} per night` : ''}`.trim();
+      params.set('q', q);
+      const href = `https://www.google.com/travel/hotels/${encodeURIComponent((near || 'Goa') + ', Goa')}?${params.toString()}`;
+      return { href, label };
+    } catch {
+      return { href: `https://www.google.com/travel/hotels/Goa`, label: 'Find stays' };
+    }
+  };
+
+  const buildExternalStayLinks = (near: string, checkinISO: string) => {
+    const checkin = new Date(checkinISO);
+    const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate() + 1);
+    const iso = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
+    const adults = (localItinerary.preferences?.party_size || localItinerary.party_size || 2) as number;
+    const nightly = (localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || 0) as number;
+    const place = `${near || 'Goa'}, Goa`;
+
+    // Booking.com price level mapping 1..5
+    let pri = 3;
+    if (nightly) {
+      if (nightly <= 1500) pri = 1; else if (nightly <= 3000) pri = 2; else if (nightly <= 6000) pri = 3; else if (nightly <= 9000) pri = 4; else pri = 5;
+    }
+    const bookingParams = new URLSearchParams({
+      ss: place,
+      checkin: iso(checkin),
+      checkout: iso(checkout),
+      group_adults: String(adults),
+      no_rooms: '1',
+      group_children: '0',
+      selected_currency: 'INR',
+    });
+    bookingParams.set('nflt', `pri%3D${pri}`);
+    const bookingUrl = `https://www.booking.com/searchresults.html?${bookingParams.toString()}`;
+
+    // MakeMyTrip
+    const maxPrice = nightly && nightly > 500 ? nightly : 0;
+    const mmtParams = new URLSearchParams({
+      checkin: iso(checkin),
+      checkout: iso(checkout),
+      city: 'Goa',
+      locusId: 'CTGOI',
+      locusType: 'city',
+    });
+    mmtParams.set('roomStayQualifier', `${adults}e0e`);
+    if (maxPrice) mmtParams.set('filters', `PRICE_RANGE:between-0-${maxPrice}`);
+    const mmtUrl = `https://www.makemytrip.com/hotels/hotel-listing/?${mmtParams.toString()}`;
+
+    return [
+      { provider: 'Booking.com', href: bookingUrl },
+      { provider: 'MakeMyTrip', href: mmtUrl },
+    ];
+  };
+
   const handleReoptimize = async () => {
     try {
       toast.loading('Re-optimizing itinerary...', { id: 'reopt' });
@@ -882,103 +957,50 @@ function ItineraryStep({ itinerary }: any) {
                       <p className="text-xs text-blue-600 mt-1">💡 {activity.notes}</p>
                     )}
                   </div>
-                  <div className="text-right"></div>
+                  <div className="text-right">
+                    {(() => {
+                      const near = activity.activity?.area || activity.activity?.neighborhood || activity.activity?.name || 'Goa';
+                      const { href, label } = buildStayLink(near, day.date);
+                      return (
+                        <a href={href} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-pink-700 border border-pink-300 hover:bg-pink-100">
+                          {label}
+                        </a>
+                      );
+                    })()}
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Stay nearby / Find Hotels button with smart criteria */
+            {/* Stay nearby (single contextual button) */}
             <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="text-sm font-semibold text-orange-800 mb-2">Stay nearby</div>
               <div className="flex flex-wrap gap-2">
-                {Array.isArray(day.hotel_suggestions) && day.hotel_suggestions.length > 0 && day.hotel_suggestions.map((h: any, i: number) => (
-                  <a key={i} href={h.url} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-orange-700 border border-orange-300 hover:bg-orange-100">
-                    {h.label}
-                  </a>
-                ))}
                 {(() => {
-                  // Fallback/companion dynamic link using day date and first activity location
-                  try {
-                    const firstAct = (day.activities && day.activities[0]?.activity) || {};
-                    const near = firstAct.area || firstAct.neighborhood || firstAct.name || 'Goa';
-                    const checkin = new Date(day.date);
-                    const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate() + 1);
-                    const iso = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
-                    const adults = localItinerary.preferences?.party_size || localItinerary.party_size || 2;
-                    const nightlyBudget = localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || '';
-                    const params = new URLSearchParams();
-                    params.set('checkin', iso(checkin));
-                    params.set('checkout', iso(checkout));
-                    params.set('adults', String(adults));
-                    params.set('hl','en-IN');
-                    params.set('gl','IN');
-                    const q = `hotels near ${near}, Goa ${nightlyBudget ? `under ₹${nightlyBudget} per night` : ''}`.trim();
-                    params.set('q', q);
-                    const href = `https://www.google.com/travel/hotels/${encodeURIComponent(near + ', Goa')}?${params.toString()}`;
-                    return (
-                      <a href={href} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-pink-700 border border-pink-300 hover:bg-pink-100">
-                        Find Hotels in Goa
-                      </a>
-                    );
-                  } catch {
-                    return null;
-                  }
+                  const firstAct = (day.activities && day.activities[0]?.activity) || {};
+                  const near = firstAct.area || firstAct.neighborhood || firstAct.name || 'Goa';
+                  const { href, label } = buildStayLink(near, day.date);
+                  return (
+                    <a href={href} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-pink-700 border border-pink-300 hover:bg-pink-100">
+                      {label}
+                    </a>
+                  );
                 })()}
+              </div>
+              <div className="mt-2 text-xs text-gray-600">
                 {(() => {
-                  // Hostels quick link
-                  try {
-                    const firstAct = (day.activities && day.activities[0]?.activity) || {};
-                    const near = firstAct.area || firstAct.neighborhood || firstAct.name || 'Goa';
-                    const checkin = new Date(day.date);
-                    const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate() + 1);
-                    const iso = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
-                    const adults = localItinerary.preferences?.party_size || localItinerary.party_size || 2;
-                    const nightlyBudget = localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || '';
-                    const params = new URLSearchParams();
-                    params.set('checkin', iso(checkin));
-                    params.set('checkout', iso(checkout));
-                    params.set('adults', String(adults));
-                    params.set('hl','en-IN');
-                    params.set('gl','IN');
-                    const q = `hostels near ${near}, Goa ${nightlyBudget ? `under ₹${nightlyBudget} per night` : ''}`.trim();
-                    params.set('q', q);
-                    const href = `https://www.google.com/travel/hotels/${encodeURIComponent(near + ', Goa')}?${params.toString()}`;
-                    return (
-                      <a href={href} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-green-700 border border-green-300 hover:bg-green-50">
-                        Find Hostels
-                      </a>
-                    );
-                  } catch {
-                    return null;
-                  }
-                })()}
-                {(() => {
-                  // Family-friendly quick link (uses natural language in q)
-                  try {
-                    const firstAct = (day.activities && day.activities[0]?.activity) || {};
-                    const near = firstAct.area || firstAct.neighborhood || firstAct.name || 'Goa';
-                    const checkin = new Date(day.date);
-                    const checkout = new Date(checkin.getFullYear(), checkin.getMonth(), checkin.getDate() + 1);
-                    const iso = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
-                    const adults = localItinerary.preferences?.party_size || localItinerary.party_size || 2;
-                    const nightlyBudget = localItinerary.preferences?.budget_per_person || localItinerary.budget_per_person || '';
-                    const params = new URLSearchParams();
-                    params.set('checkin', iso(checkin));
-                    params.set('checkout', iso(checkout));
-                    params.set('adults', String(adults));
-                    params.set('hl','en-IN');
-                    params.set('gl','IN');
-                    const q = `family friendly hotels near ${near}, Goa ${nightlyBudget ? `under ₹${nightlyBudget} per night` : ''}`.trim();
-                    params.set('q', q);
-                    const href = `https://www.google.com/travel/hotels/${encodeURIComponent(near + ', Goa')}?${params.toString()}`;
-                    return (
-                      <a href={href} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-blue-700 border border-blue-300 hover:bg-blue-50">
-                        Family-friendly
-                      </a>
-                    );
-                  } catch {
-                    return null;
-                  }
+                  const firstAct = (day.activities && day.activities[0]?.activity) || {};
+                  const near = firstAct.area || firstAct.neighborhood || firstAct.name || 'Goa';
+                  const links = buildExternalStayLinks(near, day.date);
+                  return (
+                    <span>
+                      More options:
+                      {' '}
+                      <a href={links[0].href} target="_blank" rel="noreferrer" className="underline hover:text-gray-800">Booking.com</a>
+                      {' • '}
+                      <a href={links[1].href} target="_blank" rel="noreferrer" className="underline hover:text-gray-800">MakeMyTrip</a>
+                    </span>
+                  );
                 })()}
               </div>
             </div>
