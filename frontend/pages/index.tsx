@@ -354,6 +354,38 @@ export default function Home() {
                   } catch {}
                   return null;
                 })()}
+
+      {/* Stays plan (split stays by region/hub) */}
+      {Array.isArray(localItinerary.stays) && localItinerary.stays.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Stays plan</h3>
+          <div className="space-y-3">
+            {localItinerary.stays.map((s: any, i: number) => (
+              <div key={i} className="border rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-gray-900">{s.region} · {s.area}</div>
+                  <div className="text-sm text-gray-700">{s.nights} night{s.nights>1?'s':''} · {s.checkin} → {s.checkout}</div>
+                  <div className="text-xs text-gray-600">{s.rationale}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {s.deeplinks?.google_hotels && (
+                    <a href={s.deeplinks.google_hotels} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-pink-700 border border-pink-300 hover:bg-pink-100">Google Hotels</a>
+                  )}
+                  {s.deeplinks?.booking && (
+                    <a href={s.deeplinks.booking} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-blue-700 border border-blue-300 hover:bg-blue-50">Booking.com</a>
+                  )}
+                  {s.deeplinks?.mmt && (
+                    <a href={s.deeplinks.mmt} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-green-700 border border-green-300 hover:bg-green-50">MakeMyTrip</a>
+                  )}
+                  {s.deeplinks?.airbnb && (
+                    <a href={s.deeplinks.airbnb} target="_blank" rel="noreferrer" className="text-xs px-3 py-1 rounded-lg bg-white text-red-700 border border-red-300 hover:bg-red-50">Airbnb</a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
                 <div className="mt-4 flex justify-end gap-3">
                   <button onClick={()=>setDraft(null)} className="px-4 py-2 rounded-lg border">Cancel</button>
                   <button onClick={async ()=>{
@@ -972,6 +1004,31 @@ function ItineraryStep({ itinerary }: any) {
               ))}
             </div>
 
+            {/* Transport tip for the day */}
+            {day.transport?.local && (
+              <div className="mt-3 text-sm text-gray-700 bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                🚗 {day.transport.local}
+              </div>
+            )}
+
+            {/* Daily costs */}
+            {day.costs && (
+              <div className="mt-4 p-3 bg-white border rounded-lg">
+                <div className="text-sm font-semibold text-gray-900 mb-1">Daily costs</div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">Per person: ₹{day.costs.per_person?.toLocaleString?.('en-IN') ?? day.costs.per_person}</span>
+                  <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">Group: ₹{day.costs.group_total?.toLocaleString?.('en-IN') ?? day.costs.group_total}</span>
+                </div>
+                {Array.isArray(day.costs.items) && day.costs.items.length > 0 && (
+                  <div className="mt-2 text-xs text-gray-600 flex flex-wrap gap-2">
+                    {day.costs.items.map((it:any, i:number)=> (
+                      <span key={i} className="px-2 py-1 rounded bg-gray-50 border">{it.label}: ₹{it.per_person}/pp · ₹{it.group?.toLocaleString?.('en-IN') ?? it.group}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Stay nearby (single contextual button) */}
             <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="text-sm font-semibold text-orange-800 mb-2">Stay nearby</div>
@@ -1007,6 +1064,17 @@ function ItineraryStep({ itinerary }: any) {
           </div>
         ))}
       </div>
+
+      {/* Totals */}
+      {localItinerary.totals && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+          <div className="text-sm font-semibold text-gray-900 mb-1">Trip totals</div>
+          <div className="flex justify-center gap-3 text-sm">
+            <span className="px-3 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">Per person: ₹{localItinerary.totals.per_person?.toLocaleString?.('en-IN') ?? localItinerary.totals.per_person}</span>
+            <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">Group: ₹{localItinerary.totals.group?.toLocaleString?.('en-IN') ?? localItinerary.totals.group}</span>
+          </div>
+        </div>
+      )}
 
       <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white p-6 rounded-xl text-center space-y-3">
         <h3 className="text-xl font-bold mb-2">Ready to Book Your Adventure?</h3>
