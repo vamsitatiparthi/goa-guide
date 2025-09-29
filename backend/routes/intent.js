@@ -308,6 +308,22 @@ router.post('/parse', [body('text').isString().isLength({ min: 3, max: 1000 })],
     const llm = await refineWithLLMIfAvailable(text, heur);
     const result = { ...heur, ...(llm || {}) };
 
+    // Normalize: assume current year if year appears in the past (e.g., 2024 when it's 2025)
+    const normalizeYear = (iso) => {
+      if (!iso) return iso;
+      try {
+        const [y,m,d] = iso.split('-').map(x=>parseInt(x,10));
+        const nowY = new Date().getFullYear();
+        if (y < nowY) {
+          const dt = new Date(nowY, (m||1)-1, d||1);
+          return dt.toISOString().split('T')[0];
+        }
+      } catch {}
+      return iso;
+    };
+    result.start_date = normalizeYear(result.start_date);
+    result.end_date = normalizeYear(result.end_date);
+
     // Normalize derived fields
     if (!result.start_date && result.duration_days) {
       const start = new Date();
@@ -315,6 +331,10 @@ router.post('/parse', [body('text').isString().isLength({ min: 3, max: 1000 })],
       result.start_date = start.toISOString().split('T')[0];
       result.end_date = end.toISOString().split('T')[0];
     }
+
+    // Ensure numeric fields are numbers
+    if (result.budget_per_person) result.budget_per_person = Number(result.budget_per_person);
+    if (result.party_size) result.party_size = Number(result.party_size);
 
     res.json({ parsed: result });
   } catch (e) {
